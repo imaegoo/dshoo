@@ -477,8 +477,10 @@ body.app { background: var(--sidebar-bg); }
 
 .card-wrap > .remove {
   position: absolute;
-  right: 10px;
-  bottom: 10px;
+  /* Aligned with the card's 16px padding so the action sits on the same grid
+     as the text. */
+  right: 16px;
+  bottom: 16px;
   display: none;
   padding: 1px 7px;
   font-size: 11.5px;
