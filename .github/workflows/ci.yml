@@ -52,9 +52,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The pnpm version comes from package.json's `packageManager`; passing
+      # one here as well makes the action fail with "multiple versions".
       - uses: pnpm/action-setup@v4
-        with:
-          version: 12
 
       - uses: actions/setup-node@v4
         with:
