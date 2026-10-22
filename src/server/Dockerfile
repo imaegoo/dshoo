@@ -1,7 +1,9 @@
 # syntax=docker/dockerfile:1
 
 # ---- build -----------------------------------------------------------------
-FROM golang:1.26-alpine AS build
+# Floats within the 1.27 line so the image picks up patch releases; go.mod pins
+# the exact toolchain CI and the release binaries use.
+FROM golang:1.27-alpine AS build
 
 WORKDIR /src
 COPY go.mod go.sum ./

@@ -84,6 +84,7 @@ node test/plugin-ui-check.mjs "http://127.0.0.1:<dsh端口>/?token=<启动 token
 - 插件的 `client.js` 由 dsh 以普通 script 加载：不能出现 `import`/`export`（构建后处理脚本会检查）。
 - 隧道帧的载荷上限：服务端 `SetReadLimit(64MB)`，插件 `maxPayload` 同值；改动其一必须同步另一个。
 - 代理会剥掉实例响应的 CSP / `X-Frame-Options` 与 `Set-Cookie`，并且不转发浏览器的 cookie 给实例——这是「同源内嵌 + 插件自持凭据」的前提，改动前先想清楚。
+- Go 版本：`src/server/go.mod` 的 `go` 指令钉精确补丁版本（CI 与发布二进制读它），`src/server/Dockerfile` 浮在同一个次版本线上（`golang:1.27-alpine`），以便自动吃到补丁。升级小版本时两处一起改。
 
 ## 发布
 
