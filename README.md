@@ -51,6 +51,8 @@ dsh plugin --profile web add dshoo
 
 ![实例列表](docs/instances.png)
 
+![实例](docs/instance.png)
+
 ## 配置
 
 服务端全部通过环境变量配置：
