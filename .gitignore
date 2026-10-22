@@ -1,0 +1,18 @@
+# Node / TypeScript
+node_modules/
+src/plugin/lib/
+*.tsbuildinfo
+
+# Go
+src/server/bin/
+src/server/data/
+
+# local runtime state, test output, screenshots
+.run/
+*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

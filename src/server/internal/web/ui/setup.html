@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>初始化 · DSH Fleet</title>
+    <link rel="stylesheet" href="/static/style.css" />
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
+  </head>
+  <body class="auth">
+    <main class="auth-card">
+      <span class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+            <circle cx="12" cy="5" r="2.1" />
+            <circle cx="5.5" cy="18" r="2.1" />
+            <circle cx="18.5" cy="18" r="2.1" />
+            <path d="M10.6 6.9 6.9 16.2M13.4 6.9l3.7 9.3M7.6 18h8.8" />
+          </svg>
+        </span>
+        DSH Fleet
+      </span>
+
+      <div class="auth-head">
+        <h1>创建管理员账号</h1>
+        <p>这是服务器的首次访问。设置账号后，之后每次访问都需要登录。</p>
+      </div>
+
+      <p class="alert" id="alert" role="alert"></p>
+
+      <form class="auth-form" data-endpoint="/api/setup" autocomplete="off">
+        <div class="field">
+          <label for="username">用户名</label>
+          <input class="input" id="username" name="username" type="text" required autofocus
+                 autocomplete="username" spellcheck="false" pattern="[A-Za-z0-9][A-Za-z0-9._\-]{2,31}"
+                 title="3-32 位字母、数字、点、下划线或连字符" />
+        </div>
+        <div class="field">
+          <label for="password">密码</label>
+          <input class="input" id="password" name="password" type="password" required
+                 minlength="8" autocomplete="new-password" />
+          <span class="hint">至少 8 位。忘记后可以用服务端命令 <code>-passwd</code> 重置。</span>
+        </div>
+        <div class="field">
+          <label for="confirm">确认密码</label>
+          <input class="input" id="confirm" name="confirm" type="password" required
+                 minlength="8" autocomplete="new-password" data-confirm />
+        </div>
+        <button class="btn btn-primary btn-block" type="submit">创建并登录</button>
+      </form>
+
+      <p class="auth-foot">
+        账号只用于登录这台服务器。服务器本身不保存任何实例的数据，实例上的操作由各机器的
+        DeepSeek Harness 执行。
+      </p>
+    </main>
+    <script src="/static/auth.js"></script>
+  </body>
+</html>

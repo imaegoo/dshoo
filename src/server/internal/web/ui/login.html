@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>登录 · DSH Fleet</title>
+    <link rel="stylesheet" href="/static/style.css" />
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
+  </head>
+  <body class="auth">
+    <main class="auth-card">
+      <span class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+            <circle cx="12" cy="5" r="2.1" />
+            <circle cx="5.5" cy="18" r="2.1" />
+            <circle cx="18.5" cy="18" r="2.1" />
+            <path d="M10.6 6.9 6.9 16.2M13.4 6.9l3.7 9.3M7.6 18h8.8" />
+          </svg>
+        </span>
+        DSH Fleet
+      </span>
+
+      <div class="auth-head">
+        <h1>登录</h1>
+        <p>登录后查看并连接这台服务器纳管的 DeepSeek Harness 实例。</p>
+      </div>
+
+      <p class="alert" id="alert" role="alert"></p>
+
+      <form class="auth-form" data-endpoint="/api/auth/login" autocomplete="on">
+        <div class="field">
+          <label for="username">用户名</label>
+          <input class="input" id="username" name="username" type="text" required autofocus
+                 autocomplete="username" spellcheck="false" />
+        </div>
+        <div class="field">
+          <label for="password">密码</label>
+          <input class="input" id="password" name="password" type="password" required
+                 autocomplete="current-password" />
+        </div>
+        <button class="btn btn-primary btn-block" type="submit">登录</button>
+      </form>
+
+      <p class="auth-foot">
+        未登录的访问无法看到实例列表，也无法打开任何实例。
+      </p>
+    </main>
+    <script src="/static/auth.js"></script>
+  </body>
+</html>

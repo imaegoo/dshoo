@@ -1,0 +1,65 @@
+{
+  "name": "dshoo",
+  "version": "0.0.1",
+  "description": "Remote access for DeepSeek Harness: connect an instance to a dshoo server so it can be opened from the server's web UI.",
+  "type": "module",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "icon": "./assets/icon.svg",
+  "meta": {
+    "title": "远程访问",
+    "description": "把本机 DeepSeek Harness 接到 dshoo 服务器，从服务端的 Web UI 访问这台实例。"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true
+    }
+  },
+  "engines": {
+    "node": ">=22.15"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/postbuild.mjs",
+    "watch": "tsc -p tsconfig.json --watch",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "@types/ws": "^8.18.1",
+    "typescript": "^5.9.3"
+  },
+  "files": [
+    "lib/**/*.js",
+    "cordis.patch.yml",
+    "assets/icon.svg",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "remote-access",
+    "cordis-plugin"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/imaegoo/dshoo.git",
+    "directory": "src/plugin"
+  },
+  "homepage": "https://github.com/imaegoo/dshoo#readme",
+  "bugs": {
+    "url": "https://github.com/imaegoo/dshoo/issues"
+  },
+  "author": "iMaeGoo",
+  "license": "MIT"
+}

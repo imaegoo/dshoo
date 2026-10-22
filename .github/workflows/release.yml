@@ -1,0 +1,159 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+
+jobs:
+  # The tag is the version: x.y.z, no prefix. Everything downstream reads it
+  # from here, so a malformed tag fails before anything is published.
+  version:
+    name: read version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.detect.outputs.version }}
+    steps:
+      - id: detect
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          if ! printf '%s' "$TAG" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "release tag must look like 1.2.3 (got: '$TAG')" >&2
+            exit 1
+          fi
+          echo "version=$TAG" >> "$GITHUB_OUTPUT"
+          echo "releasing $TAG"
+
+  binaries:
+    name: binaries (${{ matrix.goos }}/${{ matrix.goarch }})
+    needs: version
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        goos: [linux, darwin, windows]
+        goarch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: src/server/go.mod
+          cache-dependency-path: src/server/go.sum
+
+      - name: build
+        working-directory: src/server
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          ext=""
+          if [ "$GOOS" = "windows" ]; then ext=".exe"; fi
+          mkdir -p dist
+          go build -trimpath \
+            -ldflags "-s -w -X main.version=${VERSION}" \
+            -o "dist/dshoo-${VERSION}-${GOOS}-${GOARCH}${ext}" ./cmd/dshoo
+          ls -l dist
+
+      - name: upload to release
+        working-directory: src/server
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$TAG" dist/* --clobber
+
+  npm:
+    name: npm (dshoo)
+    needs: version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+          cache: pnpm
+
+      # Trusted publishing needs npm >= 11.5.1; the Node 22 image ships npm 10.
+      - name: upgrade npm
+        run: |
+          npm install -g npm@^11.6
+          npm --version
+
+      - name: install
+        run: pnpm install --frozen-lockfile
+
+      - name: build
+        run: pnpm build
+
+      - name: stamp release version
+        working-directory: src/plugin
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          npm pkg set "version=$VERSION"
+          node -e "const p=require('./package.json'); if (p.version !== process.env.VERSION) process.exit(1)"
+          cp ../../LICENSE ./LICENSE
+
+      # No NODE_AUTH_TOKEN on purpose: the registry authenticates this job
+      # through GitHub OIDC (trusted publishing) and records provenance.
+      - name: publish
+        working-directory: src/plugin
+        run: npm publish --access public --provenance
+
+  docker:
+    name: docker (linux/amd64, linux/arm64)
+    needs: version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-qemu-action@v3
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./src/server
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: |
+            VERSION=${{ needs.version.outputs.version }}
+          tags: |
+            ${{ env.IMAGE }}:${{ needs.version.outputs.version }}
+            ${{ env.IMAGE }}:latest
+          labels: |
+            org.opencontainers.image.title=dshoo
+            org.opencontainers.image.description=Remote control plane for DeepSeek Harness instances
+            org.opencontainers.image.version=${{ needs.version.outputs.version }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.licenses=MIT

@@ -1,0 +1,28 @@
+services:
+  dshoo:
+    build:
+      context: ./src/server
+      args:
+        VERSION: "0.0.1"
+    image: ghcr.io/imaegoo/dshoo:latest
+    container_name: dshoo
+    restart: unless-stopped
+    ports:
+      - "9830:9830"
+    environment:
+      # Set DSHOO_PUBLIC_URL when the server is reached over HTTPS so the
+      # session cookie is marked Secure.
+      # DSHOO_PUBLIC_URL: https://fleet.example.com
+      # DSHOO_SECURE_COOKIE: "true"
+      DSHOO_SESSION_DAYS: "7"
+      DSHOO_DATA: /data
+    volumes:
+      - dshoo-data:/data
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/dshoo", "-version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  dshoo-data:

@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>DSH Fleet</title>
+    <link rel="stylesheet" href="/static/style.css" />
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="sidebar-head">
+          <span class="brand">
+            <span class="brand-mark" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+                <circle cx="12" cy="5" r="2.1" />
+                <circle cx="5.5" cy="18" r="2.1" />
+                <circle cx="18.5" cy="18" r="2.1" />
+                <path d="M10.6 6.9 6.9 16.2M13.4 6.9l3.7 9.3M7.6 18h8.8" />
+              </svg>
+            </span>
+            DSH Fleet
+          </span>
+          <span class="spacer"></span>
+          <button class="icon-btn" id="refresh" type="button" title="刷新实例列表" aria-label="刷新实例列表">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 3v6h-6" /></svg>
+          </button>
+        </div>
+
+        <div class="side-label">
+          <span id="summary">实例</span>
+        </div>
+
+        <nav class="list" id="list" aria-label="实例列表"></nav>
+
+        <div class="sidebar-foot">
+          <span class="avatar" id="avatar">?</span>
+          <span class="who" id="who"></span>
+          <button class="icon-btn" id="logout" type="button" title="退出登录" aria-label="退出登录">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" /></svg>
+          </button>
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="main-head" id="head" hidden>
+          <span class="dot" id="dot"></span>
+          <span class="title" id="title"></span>
+          <span class="meta" id="meta"></span>
+          <span class="spacer"></span>
+          <button class="btn" id="reload" type="button">刷新</button>
+          <a class="btn" id="popout" href="#" target="_blank" rel="noopener">新窗口打开</a>
+        </header>
+        <div class="stage" id="stage">
+          <div class="empty" id="empty">
+            <span class="brand-mark" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+                <circle cx="12" cy="5" r="2.1" />
+                <circle cx="5.5" cy="18" r="2.1" />
+                <circle cx="18.5" cy="18" r="2.1" />
+                <path d="M10.6 6.9 6.9 16.2M13.4 6.9l3.7 9.3M7.6 18h8.8" />
+              </svg>
+            </span>
+            <h2 id="empty-title">选择一个实例</h2>
+            <p id="empty-text">从左侧选择一个实例，它的 DeepSeek Harness 界面会在这里打开。</p>
+            <div class="steps" id="empty-steps" hidden>
+              <div class="step"><b>1</b><span>在设备上安装插件：<code>dsh plugin --profile web add dshoo</code></span></div>
+              <div class="step"><b>2</b><span>重启 DeepSeek Harness，打开「设置 → 远程访问」</span></div>
+              <div class="step"><b>3</b><span>填写本服务器地址与账号密码，连接后实例会出现在左侧</span></div>
+            </div>
+          </div>
+          <iframe id="frame" title="实例界面" hidden
+                  allow="clipboard-read; clipboard-write; fullscreen"></iframe>
+        </div>
+      </main>
+    </div>
+
+    <div class="toast" id="toast"></div>
+    <script src="/static/app.js"></script>
+  </body>
+</html>

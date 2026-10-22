@@ -1,0 +1,8 @@
+# dshoo — one host row.
+#
+# The plugin keeps an outbound tunnel to a dshoo server, proxies this process's
+# own web GUI through it, and adds the "远程访问" settings section the server
+# address is configured from.
+- insert:
+    - id: dshoo
+      name: dshoo

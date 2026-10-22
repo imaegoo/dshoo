@@ -1,0 +1,22 @@
+{
+  "name": "dshoo-workspace",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Remote control plane for DeepSeek Harness instances",
+  "license": "MIT",
+  "packageManager": "pnpm@12.11.2",
+  "scripts": {
+    "build": "pnpm --filter dshoo build",
+    "typecheck": "pnpm --filter dshoo typecheck",
+    "server:build": "cd src/server && go build -o bin/dshoo ./cmd/dshoo",
+    "server:test": "cd src/server && go test ./...",
+    "server:vet": "cd src/server && go vet ./...",
+    "e2e": "node test/e2e.mjs",
+    "ui-check": "node test/browser-check.mjs",
+    "ui-check:plugin": "node test/plugin-ui-check.mjs"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.56.0",
+    "ws": "^8.18.3"
+  }
+}
