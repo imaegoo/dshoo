@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex" />
-    <title>DSH Fleet</title>
+    <title>dshoo</title>
     <link rel="stylesheet" href="/static/style.css" />
     <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
   </head>
@@ -21,7 +21,7 @@
                 <path d="M10.6 6.9 6.9 16.2M13.4 6.9l3.7 9.3M7.6 18h8.8" />
               </svg>
             </span>
-            DSH Fleet
+            dshoo
           </span>
           <span class="spacer"></span>
           <button class="icon-btn" id="refresh" type="button" title="刷新实例列表" aria-label="刷新实例列表">
@@ -52,8 +52,17 @@
           <span class="title" id="title"></span>
           <span class="meta" id="meta"></span>
           <span class="spacer"></span>
-          <button class="btn" id="reload" type="button">刷新</button>
-          <a class="btn" id="popout" href="#" target="_blank" rel="noopener">新窗口打开</a>
+          <button class="icon-btn" id="reload" type="button" title="重新加载实例页面" aria-label="重新加载实例页面">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 3v6h-6" /></svg>
+          </button>
+          <a class="icon-btn" id="popout" href="#" target="_blank" rel="noopener"
+             title="在新窗口打开" aria-label="在新窗口打开">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 4h6v6M20 4l-9 9M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5" />
+            </svg>
+          </a>
         </header>
         <div class="stage" id="stage">
           <div class="empty" id="empty">

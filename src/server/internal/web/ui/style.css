@@ -7,6 +7,8 @@
   color-scheme: light;
 
   --bg: #fff;
+  /* The harness sidebar grey, sampled from a running GUI (rgb(249,250,251)). */
+  --sidebar-bg: #f9fafb;
   --layer-1: #fff;
   --layer-2: #fff;
   --layer-3: #fff;
@@ -51,6 +53,8 @@
     color-scheme: dark;
 
     --bg: #151517;
+    /* The harness sidebar grey in dark mode (rgb(27,27,28)). */
+    --sidebar-bg: #1b1b1c;
     --layer-1: #232324;
     --layer-2: #2c2c2e;
     --layer-3: #353638;
@@ -190,17 +194,20 @@ h1, h2, h3, p { margin: 0; }
 .icon-btn {
   display: inline-grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   padding: 0;
   color: var(--label-3);
   background: transparent;
   border: 0;
   border-radius: var(--radius-sm);
   cursor: pointer;
+  text-decoration: none;
+  transition: background 0.12s ease, color 0.12s ease;
 }
 
-.icon-btn:hover { background: var(--hover); color: var(--label-1); }
+.icon-btn:hover { background: var(--hover); color: var(--label-1); text-decoration: none; }
+.icon-btn:focus-visible { outline: 2px solid var(--business); outline-offset: 1px; }
 
 .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 
@@ -259,13 +266,13 @@ h1, h2, h3, p { margin: 0; }
   display: grid;
   place-items: center;
   padding: 40px 20px;
-  background: var(--bg);
+  background: var(--sidebar-bg);
 }
 
 .auth-card {
   width: min(372px, 100%);
   padding: 28px;
-  background: var(--layer-1);
+  background: var(--bg);
   border: 0.5px solid var(--border-2);
   border-radius: var(--radius-lg);
   box-shadow: var(--panel-shadow);
@@ -303,7 +310,7 @@ h1, h2, h3, p { margin: 0; }
   min-height: 0;
   padding: 12px 8px 8px;
   border-right: 0.5px solid var(--border-1);
-  background: var(--bg);
+  background: var(--sidebar-bg);
 }
 
 .sidebar-head {
@@ -337,13 +344,13 @@ h1, h2, h3, p { margin: 0; }
   padding: 2px 0;
 }
 
+/* One instance: three lines of detail, with the status dot aligned to the name. */
 .row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   width: 100%;
-  height: 34px;
-  padding: 0 8px;
+  padding: 7px 8px;
   flex: none;
   color: var(--label-1);
   background: transparent;
@@ -356,13 +363,40 @@ h1, h2, h3, p { margin: 0; }
 
 .row:hover { background: var(--hover); }
 .row[aria-current="true"] { background: var(--hover); }
-.row .name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.row .meta { flex: none; font-size: 11.5px; color: var(--label-3); }
+
+.row .dot { margin-top: 6px; }
+
+.row .lines {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.row .name {
+  font-size: 13.5px;
+  line-height: 18px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row .sub {
+  font-size: 11.5px;
+  line-height: 16px;
+  color: var(--label-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .row .remove {
   display: none;
   flex: none;
   width: 20px;
   height: 20px;
+  margin-top: 1px;
   color: var(--label-3);
   background: transparent;
   border: 0;

@@ -55,17 +55,6 @@ async function api(path, options) {
   return body;
 }
 
-function relativeTime(iso) {
-  if (!iso) return "";
-  const then = Date.parse(iso);
-  if (!Number.isFinite(then)) return "";
-  const seconds = Math.max(0, Math.floor((Date.now() - then) / 1000));
-  if (seconds < 45) return "刚刚";
-  if (seconds < 3600) return `${Math.floor(seconds / 60)} 分钟前`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)} 小时前`;
-  return `${Math.floor(seconds / 86400)} 天前`;
-}
-
 function platformLabel(item) {
   const bits = [item.os, item.arch].filter(Boolean);
   return bits.join("/") || "";
@@ -100,16 +89,29 @@ function renderList() {
 
     const dot = document.createElement("span");
     dot.className = "dot" + (item.online ? " on" : "");
+    dot.title = item.online ? "在线" : "离线";
+
+    // Three detail lines: name, system, harness version. The dot sits on the
+    // name's line, not centred over the block.
+    const lines = document.createElement("span");
+    lines.className = "lines";
 
     const name = document.createElement("span");
     name.className = "name";
     name.textContent = item.name;
+    lines.append(name);
 
-    const meta = document.createElement("span");
-    meta.className = "meta";
-    meta.textContent = item.online ? "" : relativeTime(item.lastSeen);
+    const system = document.createElement("span");
+    system.className = "sub";
+    system.textContent = platformLabel(item) || "系统未知";
+    lines.append(system);
 
-    row.append(dot, name, meta);
+    const version = document.createElement("span");
+    version.className = "sub";
+    version.textContent = item.dshVersion ? `dsh ${item.dshVersion}` : "dsh 版本未知";
+    lines.append(version);
+
+    row.append(dot, lines);
 
     if (!item.online) {
       const remove = document.createElement("button");
