@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { normalizeServer, tunnelUrl } from "../src/plugin/lib/config.js";
+import { retryDelayMs } from "../src/plugin/lib/tunnel.js";
 
 test("normalizeServer keeps an explicit origin", () => {
   assert.equal(normalizeServer("https://fleet.example.com"), "https://fleet.example.com");
@@ -35,4 +36,18 @@ test("tunnelUrl appends the tunnel path", () => {
   assert.equal(tunnelUrl("https://example.com"), "wss://example.com/tunnel");
   assert.equal(tunnelUrl("http://127.0.0.1:9830"), "ws://127.0.0.1:9830/tunnel");
   assert.equal(tunnelUrl("https://example.com/dshoo"), "wss://example.com/dshoo/tunnel");
+});
+
+test("retry is quick when a healthy connection was cut", () => {
+  // A proxy that caps WebSocket lifetime cuts a healthy socket; the retry
+  // should be fast so the outage stays around a second.
+  assert.equal(retryDelayMs(true, 0), 1_000);
+  assert.equal(retryDelayMs(true, 2), 1_000);
+});
+
+test("retry stays at ten seconds otherwise", () => {
+  // A connection that never came up.
+  assert.equal(retryDelayMs(false, 0), 10_000);
+  // Quick retries exhausted: the connection keeps dropping straight away.
+  assert.equal(retryDelayMs(true, 3), 10_000);
 });

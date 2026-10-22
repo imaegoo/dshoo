@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/coder/websocket"
 
@@ -101,6 +102,12 @@ func (s *Server) handleProxy(w http.ResponseWriter, r *http.Request) {
 	}
 	tun, live := s.hub.Get(id)
 	if !live {
+		// An instance that just dropped is probably re-dialling (a gateway cut
+		// or a network blip). Wait for it instead of failing the request the
+		// operator already had in flight.
+		tun, live = s.waitForTunnel(r.Context(), id)
+	}
+	if !live {
 		s.proxyErrorPage(w, http.StatusBadGateway, "实例当前离线",
 			"在设备上打开 DeepSeek Harness 的「设置 → 远程访问」，点击连接后刷新这个页面。")
 		return
@@ -113,6 +120,32 @@ func (s *Server) handleProxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.proxyHTTP(w, r, tun, rest, "/i/"+id)
+}
+
+/** How long a proxied request waits for a reconnecting instance. */
+const reconnectWait = 3 * time.Second
+
+// waitForTunnel waits briefly for an instance to come back after a drop. Only
+// instances inside their reconnect window are worth waiting for; anything else
+// fails immediately.
+func (s *Server) waitForTunnel(ctx context.Context, id string) (*tunnel.Tunnel, bool) {
+	if _, reconnecting := s.offlineTimers.Load(id); !reconnecting {
+		return nil, false
+	}
+	deadline := time.Now().Add(reconnectWait)
+	for {
+		if tun, ok := s.hub.Get(id); ok {
+			return tun, true
+		}
+		if time.Now().After(deadline) {
+			return nil, false
+		}
+		select {
+		case <-ctx.Done():
+			return nil, false
+		case <-time.After(50 * time.Millisecond):
+		}
+	}
 }
 
 func (s *Server) proxyHTTP(w http.ResponseWriter, r *http.Request, tun *tunnel.Tunnel, rest, prefix string) {

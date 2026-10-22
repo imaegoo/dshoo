@@ -89,17 +89,12 @@ func (s *Server) handleTunnel(w http.ResponseWriter, r *http.Request) {
 
 	var tun *tunnel.Tunnel
 	tun = tunnel.NewTunnel(instance.ID, user.ID, conn, s.log, func() {
-		s.hub.Remove(tun)
-		bg, bgCancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer bgCancel()
-		if err := s.store.MarkOffline(bg, instance.ID); err != nil {
-			s.log.Warn("mark offline", "instance", instance.ID, "err", err)
-		}
-		s.bus.publish(event{Kind: "instance", InstanceID: instance.ID, Online: false})
-		s.log.Info("instance disconnected", "name", instance.Name, "id", instance.ID, "user", user.Username)
+		s.onTunnelClosed(tun, instance.ID, instance.Name, user.Username)
 	})
 	tun.Meta = meta
 	s.hub.Add(tun)
+	// A reconnect inside the grace period keeps the instance online.
+	s.cancelOffline(instance.ID)
 
 	if err := tun.SendJSON(tunnel.HelloAck{
 		Type:       "hello-ack",
@@ -116,6 +111,56 @@ func (s *Server) handleTunnel(w http.ResponseWriter, r *http.Request) {
 
 	go tun.Pinger(ctx, 25*time.Second)
 	_ = tun.ReadLoop(ctx)
+}
+
+// onTunnelClosed detaches a closed socket. A newer tunnel may already have
+// taken over; that close is a handover, not a disconnect, so the instance must
+// not be reported as offline.
+func (s *Server) onTunnelClosed(tun *tunnel.Tunnel, instanceID, name, username string) {
+	s.hub.Remove(tun)
+	if current, ok := s.hub.Get(instanceID); ok && current != tun {
+		return
+	}
+	s.scheduleOffline(instanceID, name, username)
+}
+
+// scheduleOffline flips an instance offline after the grace period, unless a
+// tunnel for it is registered again first.
+//
+// Proxies in front of the server commonly cap a WebSocket's lifetime, so a
+// healthy tunnel is cut at a fixed interval. Marking the instance offline the
+// moment the socket dies would flap every instance in the UI on that schedule;
+// waiting a few seconds turns the reconnect into something the operator never
+// sees.
+func (s *Server) scheduleOffline(id, name, username string) {
+	if previous, ok := s.offlineTimers.Load(id); ok {
+		previous.(*time.Timer).Stop()
+	}
+	grace := s.offlineGrace
+	timer := time.AfterFunc(grace, func() {
+		s.offlineTimers.Delete(id)
+		if s.hub.Online(id) {
+			// Reconnected inside the window: nothing to report.
+			return
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := s.store.MarkOffline(ctx, id); err != nil {
+			s.log.Warn("mark offline", "instance", id, "err", err)
+		}
+		s.bus.publish(event{Kind: "instance", InstanceID: id, Online: false})
+		s.log.Info("instance offline", "name", name, "id", id, "user", username,
+			"grace", grace.String())
+	})
+	s.offlineTimers.Store(id, timer)
+}
+
+// cancelOffline drops a pending offline transition, for example because the
+// instance just reconnected.
+func (s *Server) cancelOffline(id string) {
+	if timer, ok := s.offlineTimers.LoadAndDelete(id); ok {
+		timer.(*time.Timer).Stop()
+	}
 }
 
 // sanitizeName picks the best available display name for an instance.

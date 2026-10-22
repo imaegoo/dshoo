@@ -39,18 +39,28 @@ type Server struct {
 	// needsSetup is true until the first account exists. It is read on every
 	// request, so it stays in memory; the database still owns the decision.
 	needsSetup atomic.Bool
+
+	// offlineGrace is how long a disconnected instance stays "online" before it
+	// is reported offline, so a forced reconnect does not flap the UI.
+	offlineGrace time.Duration
+	// offlineTimers holds the pending transition per instance id.
+	offlineTimers sync.Map
 }
+
+// defaultOfflineGrace covers the plugin's retry cadence with margin.
+const defaultOfflineGrace = 30 * time.Second
 
 // New builds the server and its route table.
 func New(cfg config.Config, st *store.Store, hub *tunnel.Hub, log *slog.Logger) (*Server, error) {
 	s := &Server{
-		cfg:   cfg,
-		store: st,
-		hub:   hub,
-		log:   log,
-		bus:   newBroadcaster(),
-		lim:   newLoginLimiter(),
-		mux:   http.NewServeMux(),
+		cfg:          cfg,
+		store:        st,
+		hub:          hub,
+		log:          log,
+		bus:          newBroadcaster(),
+		lim:          newLoginLimiter(),
+		mux:          http.NewServeMux(),
+		offlineGrace: defaultOfflineGrace,
 	}
 	users, err := st.CountUsers(context.Background())
 	if err != nil {
@@ -370,7 +380,11 @@ type instanceView struct {
 }
 
 func (s *Server) view(in store.Instance) instanceView {
-	online := s.hub.Online(in.ID)
+	// An instance inside its reconnect window still counts as online: the
+	// plugin is re-dialling, and showing it as offline would flap the list on
+	// every gateway-forced reconnect.
+	_, reconnecting := s.offlineTimers.Load(in.ID)
+	online := s.hub.Online(in.ID) || reconnecting
 	v := instanceView{
 		ID: in.ID, Name: in.Name, Hostname: in.Hostname, OS: in.OS, Arch: in.Arch,
 		DSHVersion: in.DSHVersion, PluginVer: in.PluginVer, Online: online,
@@ -433,6 +447,8 @@ func (s *Server) handleDeleteInstance(w http.ResponseWriter, r *http.Request) {
 		}
 		tun.Close()
 	}
+	// The row is about to disappear, so no pending offline transition is needed.
+	s.cancelOffline(id)
 	if err := s.store.DeleteInstance(r.Context(), user.ID, id); err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			writeError(w, http.StatusNotFound, "实例不存在")
