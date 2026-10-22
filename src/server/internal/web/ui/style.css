@@ -295,129 +295,29 @@ h1, h2, h3, p { margin: 0; }
 
 /* ---------- application shell ---------- */
 
-.shell {
-  display: flex;
-  height: 100%;
-  overflow: hidden;
-  background: var(--bg);
-}
-
-.sidebar {
-  display: flex;
-  flex-direction: column;
-  width: 248px;
-  flex: none;
-  min-height: 0;
-  padding: 12px 8px 8px;
-  border-right: 0.5px solid var(--border-1);
-  background: var(--sidebar-bg);
-}
-
-.sidebar-head {
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 4px 6px 12px;
-}
-
-.sidebar-head .spacer { flex: 1 1 auto; }
-
-.side-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 8px 4px;
-  font-size: 11.5px;
-  font-weight: 500;
-  color: var(--label-3);
-}
-
-.side-label .spacer { flex: 1 1 auto; }
-
-.list {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  padding: 2px 0;
-}
-
-/* One instance: three lines of detail, with the status dot aligned to the name. */
-.row {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  width: 100%;
-  padding: 7px 8px;
+  gap: 10px;
+  height: 52px;
   flex: none;
-  color: var(--label-1);
-  background: transparent;
-  border: 0;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  text-align: left;
-  font-size: 13.5px;
+  padding: 0 20px;
+  background: var(--layer-1);
+  border-bottom: 0.5px solid var(--border-1);
 }
 
-.row:hover { background: var(--hover); }
-.row[aria-current="true"] { background: var(--hover); }
+.topbar .spacer { flex: 1 1 auto; }
 
-.row .dot { margin-top: 6px; }
-
-.row .lines {
-  flex: 1 1 auto;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.row .name {
-  font-size: 13.5px;
-  line-height: 18px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.row .sub {
-  font-size: 11.5px;
-  line-height: 16px;
-  color: var(--label-3);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.row .remove {
-  display: none;
-  flex: none;
-  width: 20px;
-  height: 20px;
-  margin-top: 1px;
-  color: var(--label-3);
-  background: transparent;
-  border: 0;
-  border-radius: 6px;
-  cursor: pointer;
-}
-.row:hover .remove { display: grid; place-items: center; }
-.row .remove:hover { background: var(--hover-danger); color: var(--error); }
-
-.sidebar-foot {
-  display: flex;
+.topbar .who {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 8px;
-  padding: 8px 6px 4px;
-  border-top: 0.5px solid var(--border-1);
+  gap: 7px;
   font-size: 12.5px;
   color: var(--label-2);
 }
-
-.sidebar-foot .who { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .avatar {
   display: grid;
@@ -433,54 +333,176 @@ h1, h2, h3, p { margin: 0; }
   text-transform: uppercase;
 }
 
-.main {
-  display: flex;
-  flex-direction: column;
-  flex: 1 1 auto;
-  min-width: 0;
-  min-height: 0;
+/* The list page sits on the harness sidebar grey; the cards are surfaces. */
+body.app { background: var(--sidebar-bg); }
+
+.page {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 28px 20px 56px;
 }
 
-.main-head {
+.page-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.page-head h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.page-head .summary {
+  font-size: 12.5px;
+  color: var(--label-3);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px;
+  color: inherit;
+  background: var(--layer-1);
+  border: 0.5px solid var(--border-2);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color 0.14s ease, box-shadow 0.14s ease, transform 0.14s ease;
+}
+
+.card:hover {
+  border-color: var(--border-4);
+  box-shadow: var(--panel-shadow);
+  transform: translateY(-1px);
+  text-decoration: none;
+  color: inherit;
+}
+
+.card:focus-visible {
+  outline: 2px solid var(--business);
+  outline-offset: 2px;
+}
+
+.card-top {
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 50px;
-  flex: none;
-  padding: 0 14px;
-  border-bottom: 0.5px solid var(--border-1);
+  min-width: 0;
 }
 
-.main-head .title { font-size: 13.5px; font-weight: 600; }
-.main-head .meta { font-size: 11.5px; color: var(--label-3); }
-.main-head .spacer { flex: 1 1 auto; }
-
-.stage {
-  position: relative;
+.card-name {
   flex: 1 1 auto;
-  min-height: 0;
+  min-width: 0;
+  font-size: 14.5px;
+  font-weight: 600;
+  line-height: 20px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-arrow {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  color: var(--label-4);
+  opacity: 0;
+  transition: opacity 0.14s ease, color 0.14s ease;
+}
+
+.card:hover .card-arrow { opacity: 1; color: var(--label-2); }
+
+.card-lines {
   display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
 }
 
-.stage iframe {
-  width: 100%;
-  height: 100%;
-  border: 0;
-  background: var(--bg);
+.card-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12.5px;
+  line-height: 18px;
+  min-width: 0;
 }
 
-.stage iframe[hidden] { display: none; }
+.card-line > span:first-child {
+  flex: none;
+  width: 34px;
+  color: var(--label-4);
+}
+
+.card-line > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--label-2);
+}
+
+.card-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--label-3);
+}
+
+.card-foot .online { color: var(--success); }
+
+/* The remove action lives beside the link, not inside it, so the card stays a
+   plain anchor (middle-click and keyboard both behave). */
+.card-wrap { position: relative; display: flex; min-width: 0; }
+.card-wrap > .card { flex: 1 1 auto; }
+
+.card-wrap > .remove {
+  position: absolute;
+  top: 9px;
+  right: 9px;
+  display: none;
+  padding: 1px 7px;
+  font-size: 11.5px;
+  line-height: 18px;
+  color: var(--label-3);
+  background: var(--layer-1);
+  border: 0.5px solid var(--border-2);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.card-wrap:hover > .remove { display: inline-block; }
+.card-wrap > .remove:hover { background: var(--hover-danger); color: var(--error); border-color: transparent; }
+
+/* ---------- empty state ---------- */
 
 .empty {
-  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   gap: 10px;
-  padding: 32px;
+  margin-top: 12px;
+  padding: 44px 24px;
   text-align: center;
   color: var(--label-3);
+  background: var(--layer-1);
+  border: 0.5px dashed var(--border-3);
+  border-radius: var(--radius-lg);
 }
 
 .empty .brand-mark { width: 40px; height: 40px; border-radius: var(--radius-md); margin-bottom: 4px; }
@@ -503,7 +525,7 @@ h1, h2, h3, p { margin: 0; }
   font-size: 12.5px;
   line-height: 1.6;
   color: var(--label-2);
-  background: var(--layer-1);
+  background: var(--sidebar-bg);
   border: 0.5px solid var(--border-2);
   border-radius: var(--radius-sm);
 }
@@ -551,20 +573,57 @@ h1, h2, h3, p { margin: 0; }
 
 .toast.show { opacity: 1; }
 
-@media (max-width: 720px) {
-  .sidebar { width: 200px; }
-  .main-head .meta { display: none; }
+/* Rendered inside the instance frame when the tunnel is down. */
+body.embed-body { background: var(--bg); }
+
+.embed-error {
+  max-width: 420px;
+  margin: 16vh auto 0;
+  padding: 0 24px;
+  text-align: center;
 }
 
-@media (max-width: 560px) {
-  .shell { flex-direction: column; }
-  .sidebar {
-    width: 100%;
-    height: auto;
-    max-height: 38%;
-    border-right: 0;
-    border-bottom: 0.5px solid var(--border-1);
-  }
-  .main { flex: 1 1 auto; }
+.embed-error-mark {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  margin: 0 auto 14px;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--warn);
+  border: 0.5px solid color-mix(in srgb, var(--warn) 45%, transparent);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
+}
+
+.embed-error h1 {
+  margin: 0 0 8px;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--label-1);
+}
+
+.embed-error p {
+  margin: 0 0 18px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--label-3);
+}
+
+/* ---------- one instance, full page ---------- */
+
+/* The card list links straight to /i/<id>/, so the harness owns the viewport
+   and the only styles that still belong here are the error page above. */
+
+@media (max-width: 900px) {
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 620px) {
+  .grid { grid-template-columns: minmax(0, 1fr); }
+  .page { padding: 20px 14px 40px; }
   .auth-card { padding: 22px 18px; }
+  .topbar { padding: 0 14px; }
+  .topbar .who span:last-child { display: none; }
 }

@@ -62,38 +62,31 @@ page.on("console", (message) => {
 page.on("pageerror", (error) => consoleErrors.push(error.message));
 
 await page.goto(new URL("/", server).href, { waitUntil: "networkidle" });
-await page.waitForSelector(".row, .empty", { timeout: 15000 });
-const rows = await page.locator(".row").count();
-check("instance list renders", rows >= 1, `${rows} row(s)`);
+await page.waitForSelector(".card, .empty", { timeout: 15000 });
+const cards = await page.locator(".card").count();
+check("instance list renders", cards >= 1, `${cards} card(s)`);
 await page.screenshot({ path: `${shots}instances.png` });
 
-// Open a live instance: an offline row renders the control plane's own
-// "instance offline" page, which is not what this check wants to exercise.
-const online = page.locator(".row:has(.dot.on)").first();
-const target = (await online.count()) > 0 ? online : page.locator(".row").first();
+// Open a live instance: an offline card leads to the proxy's own "instance
+// offline" page, which is not what this check wants to exercise.
+const online = page.locator(".card:has(.dot.on)").first();
+const target = (await online.count()) > 0 ? online : page.locator(".card").first();
 await target.click();
-await page.waitForFunction(() => {
-  const frame = document.querySelector("iframe#frame");
-  return frame instanceof HTMLIFrameElement && frame.getAttribute("src")?.startsWith("/i/");
-}, undefined, { timeout: 10000 }).catch(() => {});
-check("instance opens in the stage", await page.locator("iframe#frame").isVisible());
-check("instance header shows the name", (await page.locator(".main-head .title").textContent())?.trim().length > 0);
+await page.waitForURL(/\/i\/[^/]+\//u, { timeout: 10000 }).catch(() => {});
+check("card opens the instance UI directly", /\/i\/[^/]+\//u.test(page.url()), page.url());
 
 // The harness renders its shell once the module graph boots and the mux
-// handshake completes. The sidebar action is hidden on narrow frames, so any
-// distinctive piece of the shell counts.
+// handshake completes. The card list hands the browser straight to /i/<id>/,
+// so the harness owns the top-level document here.
 const SHELL_TEXT = /新会话|New session|探索未至之境|标准模式/u;
 await page.waitForFunction((pattern) => {
-  const frame = document.querySelector("iframe#frame");
-  return frame instanceof HTMLIFrameElement
-    && new RegExp(pattern, "u").test(frame.contentDocument?.body?.innerText ?? "");
+  const root = document.querySelector("#root");
+  return (root?.children.length ?? 0) > 0
+    && new RegExp(pattern, "u").test(document.body.innerText);
 }, SHELL_TEXT.source, { timeout: 45000 }).catch(() => {});
-const frameText = await page.evaluate(() => {
-  const frame = document.querySelector("iframe#frame");
-  return frame instanceof HTMLIFrameElement ? frame.contentDocument?.body?.innerText ?? "" : "";
-});
-check("harness shell rendered", SHELL_TEXT.test(frameText),
-  `${frameText.trim().slice(0, 40).replace(/\s+/gu, " ")}…`);
+const pageText = await page.locator("body").innerText();
+check("harness shell rendered", SHELL_TEXT.test(pageText),
+  `${pageText.trim().slice(0, 40).replace(/\s+/gu, " ")}…`);
 await page.waitForTimeout(1200);
 await page.screenshot({ path: `${shots}instance.png` });
 

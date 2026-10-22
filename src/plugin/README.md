@@ -4,6 +4,10 @@
 
 ## 安装
 
+**方式一：桌面版**——打开 DeepSeek Harness 桌面版，点击左侧 **插件 → 添加插件**，输入包名 `dshoo`，点**安装**，再点**立即启用**。
+
+**方式二：命令行**——
+
 ```sh
 dsh plugin --profile web add dshoo
 ```
