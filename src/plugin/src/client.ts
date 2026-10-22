@@ -139,11 +139,12 @@ function relativeTime(ms: number): string {
       const [error, setError] = useState("");
       const [saved, setSaved] = useState(false);
 
-      /** Pending auto-save, flushed before an explicit connect. */
+      /** Pending auto-save for the non-secret fields. */
       const saveTimer = useRef<number | undefined>(undefined);
       const draftRef = useRef<Draft>(draft);
       draftRef.current = draft;
       const loaded = useRef(false);
+      const passwordInput = useRef<HTMLInputElement | null>(null);
 
       const applySnapshot = useCallback((next: Snapshot, fillDraft: boolean) => {
         setSnapshot(next);
@@ -168,14 +169,18 @@ function relativeTime(ms: number): string {
         }
       }, [applySnapshot]);
 
-      /** Send the current draft; `password` is only sent when the user typed one. */
-      const save = useCallback(async (): Promise<Snapshot | null> => {
+      /**
+       * Send the current draft. The password is only included when the caller
+       * asks for it: a debounced save never carries a half-typed password.
+       */
+      const save = useCallback(async (options: { includePassword?: boolean } = {}): Promise<Snapshot | null> => {
+        const includePassword = options.includePassword === true && draftRef.current.password !== "";
         const body: Record<string, unknown> = {
           server: draftRef.current.server,
           username: draftRef.current.username,
           name: draftRef.current.name,
         };
-        if (draftRef.current.password !== "") body.password = draftRef.current.password;
+        if (includePassword) body.password = draftRef.current.password;
         try {
           const response = await fetch(apiUrl(), {
             method: "POST",
@@ -188,7 +193,11 @@ function relativeTime(ms: number): string {
             return null;
           }
           setError("");
-          setDraft((current) => ({ ...current, password: "" }));
+          // Clear the secret only once the field is no longer being edited, so
+          // a save can never wipe what the operator is still typing.
+          if (includePassword && document.activeElement !== passwordInput.current) {
+            setDraft((current) => ({ ...current, password: "" }));
+          }
           setSaved(true);
           window.setTimeout(() => setSaved(false), 1600);
           applySnapshot(payload, false);
@@ -207,19 +216,13 @@ function relativeTime(ms: number): string {
         }, 700);
       }, [save]);
 
-      /** Flush a pending save now, so a button press sees the latest values. */
-      const flush = useCallback(async () => {
-        if (saveTimer.current === undefined) return;
-        window.clearTimeout(saveTimer.current);
-        saveTimer.current = undefined;
-        await save();
-      }, [save]);
-
       const act = useCallback(async (action: "connect" | "disconnect") => {
         setBusy(true);
         setError("");
         try {
-          await flush();
+          // The action carries the whole form, so a pending debounce does not
+          // need to be flushed first; it re-sends the same values without the
+          // password and changes nothing.
           const body: Record<string, unknown> = {
             server: draftRef.current.server,
             username: draftRef.current.username,
@@ -244,7 +247,7 @@ function relativeTime(ms: number): string {
         } finally {
           setBusy(false);
         }
-      }, [applySnapshot, flush]);
+      }, [applySnapshot]);
 
       useEffect(() => {
         void refresh(true);
@@ -254,7 +257,10 @@ function relativeTime(ms: number): string {
 
       const edit = (key: keyof Draft, value: string): void => {
         setDraft((current) => ({ ...current, [key]: value }));
-        scheduleSave();
+        // The password is committed when the field loses focus: a debounced
+        // save would otherwise persist a half-typed secret and clear the field
+        // under the operator's fingers.
+        if (key !== "password") scheduleSave();
       };
 
       if (snapshot === null) {
@@ -319,11 +325,15 @@ function relativeTime(ms: number): string {
           h("div", { className: "dshoo-field" },
             h("span", null, "密码"),
             h("input", {
+              ref: passwordInput,
               value: draft.password,
               type: "password",
               placeholder: config.hasPassword ? "已保存" : "服务器登录密码",
               autoComplete: "current-password",
               onChange: (event: { target: { value: string } }) => edit("password", event.target.value),
+              onBlur: () => {
+                if (draftRef.current.password !== "") void save({ includePassword: true });
+              },
             }),
           ),
         ),
