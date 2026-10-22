@@ -382,7 +382,9 @@ body.app { background: var(--sidebar-bg); }
   transition: border-color 0.14s ease, box-shadow 0.14s ease, transform 0.14s ease;
 }
 
-.card:hover {
+/* Hovering the corner action still counts as hovering the card. */
+.card:hover,
+.card-wrap:hover > .card {
   border-color: var(--border-4);
   box-shadow: var(--panel-shadow);
   transform: translateY(-1px);
@@ -424,7 +426,8 @@ body.app { background: var(--sidebar-bg); }
   transition: opacity 0.14s ease, color 0.14s ease;
 }
 
-.card:hover .card-arrow { opacity: 1; color: var(--label-2); }
+.card:hover .card-arrow,
+.card-wrap:hover .card-arrow { opacity: 1; color: var(--label-2); }
 
 .card-lines {
   display: flex;
@@ -467,14 +470,15 @@ body.app { background: var(--sidebar-bg); }
 .card-foot .online { color: var(--success); }
 
 /* The remove action lives beside the link, not inside it, so the card stays a
-   plain anchor (middle-click and keyboard both behave). */
+   plain anchor (middle-click and keyboard both behave). It sits in the bottom
+   corner because the top-right one belongs to the open arrow on hover. */
 .card-wrap { position: relative; display: flex; min-width: 0; }
 .card-wrap > .card { flex: 1 1 auto; }
 
 .card-wrap > .remove {
   position: absolute;
-  top: 9px;
-  right: 9px;
+  right: 10px;
+  bottom: 10px;
   display: none;
   padding: 1px 7px;
   font-size: 11.5px;
