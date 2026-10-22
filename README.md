@@ -25,11 +25,19 @@ DSHOO_DATA=./data ./dshoo-<version>-linux-x64
 
 ### 2. 在设备上安装插件
 
+**方式一：在桌面版里安装（推荐）**
+
+打开 DeepSeek Harness 桌面版，点击左侧 **插件 → 添加插件**，输入插件包名 `dshoo`，点击**安装**，装好后点击**立即启用**。
+
+**方式二：命令行**
+
 ```sh
 dsh plugin --profile web add dshoo
 ```
 
-桌面版用 `--profile desktop`。装完重启 dsh，打开 **设置 → 远程访问**，填写服务端地址、用户名、密码，点「连接」。
+桌面版用 `--profile desktop`。装完重启一次 dsh。
+
+无论用哪种方式，装好后打开 **设置 → 远程访问**，填写服务端地址、用户名、密码，点「连接」。
 
 ![插件设置页](docs/plugin.png)
 
