@@ -143,27 +143,35 @@ function relativeTime(ms: number): string {
       const saveTimer = useRef<number | undefined>(undefined);
       const draftRef = useRef<Draft>(draft);
       draftRef.current = draft;
-      const loaded = useRef(false);
+      /** True while the operator has edits that are not saved yet. */
+      const dirty = useRef(false);
       const passwordInput = useRef<HTMLInputElement | null>(null);
 
-      const applySnapshot = useCallback((next: Snapshot, fillDraft: boolean) => {
+      /**
+       * Adopt a host snapshot.
+       *
+       * The form follows the host whenever the operator is not editing it, so
+       * reopening the page (or another window saving first) always shows the
+       * stored configuration instead of an empty form. While an edit is
+       * pending the draft wins, and the password box is never rewritten while
+       * it has focus.
+       */
+      const applySnapshot = useCallback((next: Snapshot) => {
         setSnapshot(next);
-        if (fillDraft && !loaded.current) {
-          loaded.current = true;
-          setDraft({
-            server: next.config.server,
-            username: next.config.username,
-            name: next.config.name,
-            password: "",
-          });
-        }
+        if (dirty.current) return;
+        setDraft((current) => ({
+          server: next.config.server,
+          username: next.config.username,
+          name: next.config.name,
+          password: document.activeElement === passwordInput.current ? current.password : "",
+        }));
       }, []);
 
-      const refresh = useCallback(async (fillDraft = false) => {
+      const refresh = useCallback(async () => {
         try {
           const response = await fetch(apiUrl(), { headers: { accept: "application/json" } });
           if (!response.ok) return;
-          applySnapshot((await response.json()) as Snapshot, fillDraft);
+          applySnapshot((await response.json()) as Snapshot);
         } catch {
           // Keep the last known state; the next poll retries.
         }
@@ -193,14 +201,10 @@ function relativeTime(ms: number): string {
             return null;
           }
           setError("");
-          // Clear the secret only once the field is no longer being edited, so
-          // a save can never wipe what the operator is still typing.
-          if (includePassword && document.activeElement !== passwordInput.current) {
-            setDraft((current) => ({ ...current, password: "" }));
-          }
+          dirty.current = false;
           setSaved(true);
           window.setTimeout(() => setSaved(false), 1600);
-          applySnapshot(payload, false);
+          applySnapshot(payload);
           return payload;
         } catch (err) {
           setError((err as Error).message || "无法访问插件接口");
@@ -240,8 +244,8 @@ function relativeTime(ms: number): string {
             setError(payload.error ?? "操作失败");
             return;
           }
-          setDraft((current) => ({ ...current, password: "" }));
-          applySnapshot(payload, false);
+          dirty.current = false;
+          applySnapshot(payload);
         } catch (err) {
           setError((err as Error).message || "无法访问插件接口");
         } finally {
@@ -250,12 +254,13 @@ function relativeTime(ms: number): string {
       }, [applySnapshot]);
 
       useEffect(() => {
-        void refresh(true);
-        const timer = window.setInterval(() => { void refresh(false); }, 2500);
+        void refresh();
+        const timer = window.setInterval(() => { void refresh(); }, 2500);
         return () => window.clearInterval(timer);
       }, [refresh]);
 
       const edit = (key: keyof Draft, value: string): void => {
+        dirty.current = true;
         setDraft((current) => ({ ...current, [key]: value }));
         // The password is committed when the field loses focus: a debounced
         // save would otherwise persist a half-typed secret and clear the field

@@ -67,7 +67,11 @@ const rows = await page.locator(".row").count();
 check("instance list renders", rows >= 1, `${rows} row(s)`);
 await page.screenshot({ path: `${shots}instances.png` });
 
-await page.locator(".row").first().click();
+// Open a live instance: an offline row renders the control plane's own
+// "instance offline" page, which is not what this check wants to exercise.
+const online = page.locator(".row:has(.dot.on)").first();
+const target = (await online.count()) > 0 ? online : page.locator(".row").first();
+await target.click();
 await page.waitForFunction(() => {
   const frame = document.querySelector("iframe#frame");
   return frame instanceof HTMLIFrameElement && frame.getAttribute("src")?.startsWith("/i/");

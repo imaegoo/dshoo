@@ -123,6 +123,11 @@ export function apply(ctx: PluginContext): void {
     const client: TunnelClient = new TunnelClient(url, config.username, config.password, {
       hello: () => meta,
       onFrame: (frame) => bridge?.onFrame(frame),
+      // A new socket restarts stream ids from 1, so drop everything the old
+      // socket had in flight before dialling.
+      onDial: () => {
+        bridge?.reset();
+      },
       onState: (state, detail) => {
         status.state = state;
         status.detail = detail ?? "";
@@ -136,7 +141,7 @@ export function apply(ctx: PluginContext): void {
           log(`connected to ${config.server} as instance ${status.instanceId}`);
         }
         if (state === "reconnecting") {
-          warn(`tunnel lost (${detail ?? "unknown"}), retrying in 10s`);
+          warn(`tunnel lost (${detail ?? "unknown"}), reconnecting automatically`);
         }
       },
     }, log);

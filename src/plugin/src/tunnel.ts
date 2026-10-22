@@ -13,10 +13,39 @@ export interface TunnelHandlers {
   onState(state: TunnelState, detail?: string): void;
   /** Builds the hello payload, called once per connection attempt. */
   hello(): HelloMeta;
+  /**
+   * Called before every connection attempt. Stream ids restart at 1 on the
+   * server for each new socket, so anything still in flight on the previous
+   * socket must be dropped before the new one is dialled.
+   */
+  onDial?(): void;
 }
 
-/** Retry cadence after a drop or a failed attempt. */
+/** Retry cadence while a connection cannot be established. */
 const RETRY_DELAY = 10_000;
+/** A connection that served for this long earns an immediate retry when it drops. */
+const HEALTHY_CONNECTION_MS = 2_000;
+/** Delay after a healthy connection was cut, for example by a gateway. */
+const QUICK_RETRY_DELAY = 1_000;
+/** Consecutive quick retries allowed before falling back to the steady cadence. */
+const MAX_QUICK_RETRIES = 3;
+
+/**
+ * Wait before the next dial.
+ *
+ * A gateway that caps WebSocket lifetime cuts a perfectly healthy connection;
+ * retrying that immediately turns a five-minute timeout into a one-second blip
+ * instead of a ten-second outage. A connection that never came up keeps the
+ * steady cadence, and so does one that dropped straight after a quick retry,
+ * so a server that rejects every socket cannot cause a busy loop.
+ * @param wasHealthy - whether the connection that just dropped had served for
+ *   at least {@link HEALTHY_CONNECTION_MS}.
+ * @param quickAttempts - consecutive quick retries already spent.
+ * @returns the delay in milliseconds.
+ */
+export function retryDelayMs(wasHealthy: boolean, quickAttempts: number): number {
+  return wasHealthy && quickAttempts < MAX_QUICK_RETRIES ? QUICK_RETRY_DELAY : RETRY_DELAY;
+}
 
 /**
  * Outbound WebSocket to a dshoo server.
@@ -33,6 +62,12 @@ export class TunnelClient {
   private ack?: HelloAck;
   private stopped = true;
   private detail = "";
+  /** When the current socket completed its handshake, if it did. */
+  private connectedAt?: number;
+  /** Whether the connection that just dropped had been healthy. */
+  private wasHealthy = false;
+  /** Consecutive quick retries spent since the last healthy connection. */
+  private quickAttempts = 0;
 
   constructor(
     private readonly url: string,
@@ -94,6 +129,10 @@ export class TunnelClient {
     if (this.stopped) return;
     const authorization = `Basic ${Buffer.from(`${this.username}:${this.password}`, "utf8").toString("base64")}`;
     this.handlers.onState(this.attempt === 0 ? "connecting" : "reconnecting", this.detail);
+    // The previous socket is gone; forget its streams before the new one can
+    // reuse the same ids.
+    this.handlers.onDial?.();
+    this.connectedAt = undefined;
 
     const socket = new WebSocket(this.url, {
       headers: {
@@ -136,6 +175,11 @@ export class TunnelClient {
       if (this.socket !== socket) return;
       this.socket = undefined;
       this.ack = undefined;
+      const lived = this.connectedAt === undefined ? 0 : Date.now() - this.connectedAt;
+      this.connectedAt = undefined;
+      this.wasHealthy = lived >= HEALTHY_CONNECTION_MS;
+      // A connection that lasted resets the flapping guard.
+      if (this.wasHealthy) this.quickAttempts = 0;
       this.detail = code === 1006 ? "连接被中断" : `连接关闭（${code}）`;
       this.scheduleReconnect();
     });
@@ -175,6 +219,7 @@ export class TunnelClient {
         serverTime: typeof ack.serverTime === "number" ? ack.serverTime : 0,
       };
       this.attempt = 0;
+      this.connectedAt = Date.now();
       this.detail = "";
       this.handlers.onState("connected");
     }
@@ -183,11 +228,13 @@ export class TunnelClient {
   private scheduleReconnect(): void {
     if (this.stopped) return;
     this.handlers.onState("reconnecting", this.detail);
+    const delay = retryDelayMs(this.wasHealthy, this.quickAttempts);
+    if (delay === QUICK_RETRY_DELAY) this.quickAttempts += 1;
     this.attempt += 1;
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = undefined;
       this.open();
-    }, RETRY_DELAY);
+    }, delay);
     this.reconnectTimer.unref?.();
   }
 

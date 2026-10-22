@@ -61,15 +61,23 @@ if (!hasSettings) {
   process.exit(1);
 }
 
-await settingsButton.click();
-await page.waitForTimeout(900);
+/** Open the settings dialog and land on the remote-access section. */
+const openSection = async () => {
+  await page.locator('[aria-label*="账号菜单"], [aria-label*="Account"]').first().click();
+  await page.waitForTimeout(700);
+  const item = page.getByText("设置", { exact: true }).first();
+  if (await item.count() > 0) {
+    await item.click();
+    await page.waitForTimeout(900);
+  }
+  const section = page.getByText("远程访问", { exact: true }).first();
+  if (await section.count() > 0) {
+    await section.click();
+    await page.waitForTimeout(900);
+  }
+};
 
-// The account menu opens the settings surface in this release.
-const settingsItem = page.getByText("设置", { exact: true }).first();
-if (await settingsItem.count() > 0) {
-  await settingsItem.click();
-  await page.waitForTimeout(900);
-}
+await openSection();
 
 const remoteSection = page.getByText("远程访问", { exact: true }).first();
 check("远程访问 section registered", await remoteSection.count() > 0);
@@ -131,6 +139,18 @@ if (await remoteSection.count() > 0) {
   } else {
     console.log("note: pass the password as the second argument to exercise the password autosave regression");
   }
+
+  // Regression: reopening the page must show the stored configuration, not an
+  // empty form.
+  const readInputs = async () => page.locator(".dshoo input").evaluateAll((nodes) => nodes.map((node) => node.value));
+  const beforeValues = await readInputs();
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(900);
+  await openSection();
+  const afterValues = await readInputs();
+  check("form refills after reopening",
+    afterValues[0] === beforeValues[0] && afterValues[1] === beforeValues[1] && afterValues[0] !== "",
+    `${JSON.stringify(afterValues.slice(0, 2))}`);
 }
 
 // Closing the settings page must not drop the tunnel.
