@@ -104,6 +104,33 @@ if (await remoteSection.count() > 0) {
   // Restore the name so the screenshot and later runs stay stable.
   await nameInput.fill("test-lab");
   await page.waitForTimeout(1600);
+
+  // Regression: a half-typed password must never be saved or cleared. The
+  // typed value is passed in so the run leaves the stored secret unchanged.
+  const password = process.argv[3];
+  if (password) {
+    await page.waitForTimeout(2000); // let the previous "已保存" note expire
+    const passwordInput = page.locator(".dshoo input[type=password]");
+    await passwordInput.click();
+    await passwordInput.pressSequentially(password, { delay: 120 });
+    check("password keeps the typed text", await passwordInput.inputValue() === password);
+    check("no autosave while typing the password", await page.locator(".dshoo-note").count() === 0);
+
+    // Past the 700ms debounce window, still untouched and still unsaved.
+    await page.waitForTimeout(1200);
+    check("password survives the debounce window", await passwordInput.inputValue() === password);
+    check("still no autosave", await page.locator(".dshoo-note").count() === 0);
+
+    // Leaving the field commits it, and only then is the box cleared.
+    await page.locator(".dshoo input").first().click();
+    await page.waitForTimeout(1500);
+    check("password saves on blur", await page.locator(".dshoo-note").count() > 0);
+    check("password box cleared after blur", await passwordInput.inputValue() === "");
+    const afterPassword = await readState();
+    check("server still holds a password", afterPassword.config.hasPassword === true);
+  } else {
+    console.log("note: pass the password as the second argument to exercise the password autosave regression");
+  }
 }
 
 // Closing the settings page must not drop the tunnel.
