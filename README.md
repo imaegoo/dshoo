@@ -39,19 +39,19 @@ dsh plugin --profile web add dshoo
 
 无论用哪种方式，装好后打开 **设置 → 远程访问**，填写服务端地址、用户名、密码，点「连接」。
 
-![插件设置页](docs/plugin.png)
+![插件设置页](docs/plugin.webp)
 
 连接成功后这台实例出现在服务端的实例列表里；只要 dsh 在运行就会自动重连（断线后约 1 秒重试，连不上时每 10 秒），点「断开连接」才会停止自动连接。
 
 ### 3. 从服务端打开实例
 
-![登录页](docs/login.png)
+![登录页](docs/login.webp)
 
 登录后是一页实例卡片，点任意一张卡片就直接进入那台机器的 dsh 界面（同一份工作区与会话）。离线实例的卡片会标出来，可以就地移除记录。
 
-![实例列表](docs/instances.png)
+![实例列表](docs/instances.webp)
 
-![实例](docs/instance.png)
+![实例](docs/instance.webp)
 
 ## 配置
 
