@@ -14,7 +14,7 @@ src/server/          Go 服务端（module dshoo）
   internal/web/ui/   内嵌前端（login / setup / app + style.css）
 src/plugin/          dsh 插件（npm 包名 dshoo，TS → lib/）
   src/index.ts       插件装配、设置 API、隧道生命周期
-  src/tunnel.ts      到服务端的 WSS 客户端（固定 10s 重试）
+  src/tunnel.ts      到服务端的 WSS 客户端（健康后 1s / 其余 10s 重试）
   src/bridge.ts      帧 ⇄ 本机 dsh 的 HTTP/WebSocket 代理
   src/harness.ts     本机 GUI 端口与登录 cookie
   src/config.ts      ~/.dsh/dshoo.json
@@ -53,8 +53,8 @@ node test/plugin-ui-check.mjs "http://127.0.0.1:<dsh端口>/?token=<启动 token
 ```
 
 - `e2e.mjs`：首次初始化（或 409）、登录、实例列表、实例首页、`/plugins/...` 前端模块、`/api/remote.mux` WebSocket。
-- `browser-check.mjs`：未登录访问必须落到 `/login`；登录后点实例，iframe 内 dsh 完整启动且无控制台报错。
-- `plugin-ui-check.mjs`：直接打开 dsh GUI，断言「远程访问」入口注册、字段与连接状态渲染。
+- `browser-check.mjs`：未登录访问必须落到 `/login`；登录后点卡片直接进入 `/i/<id>/`，dsh 完整启动且无控制台报错。
+- `plugin-ui-check.mjs`：直接打开 dsh GUI，断言「远程访问」入口注册、字段与连接状态渲染、密码输入不留存、重开设置页回填。
 
 ## 工作原理
 
@@ -64,7 +64,7 @@ node test/plugin-ui-check.mjs "http://127.0.0.1:<dsh端口>/?token=<启动 token
 
 **本机鉴权**：dsh 的 GUI 只绑回环，且要求按 authority 签名的 cookie。插件用 `connection.authenticatedUrl()` 换一次性登录 cookie 并自己保管，浏览器的会话与服务端账号互不影响，多实例也不会串号。
 
-**路径前缀**：实例挂在 `/i/<实例 id>/`，`/i/<id>` 会 302 到 `/i/<id>/`。dsh 前端产物是相对路径（含 `<base href="./">`），插件只对可能出现的根绝对路径（`/plugins/`、`/assets/`）做兜底改写，见 `bridge.ts` 的 `rewriteIndex`。
+**路径前缀**：实例挂在 `/i/<实例 id>/`，`/i/<id>` 会 302 到 `/i/<id>/`。实例列表是一页卡片，卡片直接链到 `/i/<id>/`，没有中间页；dsh 前端产物是相对路径（含 `<base href="./">`），插件只对可能出现的根绝对路径（`/plugins/`、`/assets/`）做兜底改写，见 `bridge.ts` 的 `rewriteIndex`。
 
 **离线与重连**：网关常给 WebSocket 加最大存活时间（例如 5 分钟），所以「断线」是常态而非异常。处理方式：
 
