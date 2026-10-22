@@ -39,7 +39,7 @@ pnpm build                        # 产出 src/plugin/lib
 
 # 本地联调
 cd src/server && DSHOO_DATA=./data go run ./cmd/dshoo
-dsh plugin --profile web add <repo>/src/plugin
+dsh plugin --profile web add "$PWD/src/plugin"
 ```
 
 ## 端到端验证
