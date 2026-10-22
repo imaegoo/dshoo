@@ -337,7 +337,8 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {	token := s.requestToken(r)
+func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
+	token := s.requestToken(r)
 	if token != "" {
 		_ = s.store.DeleteSession(r.Context(), store.TokenHash(token))
 	}
@@ -530,9 +531,9 @@ func (w *statusWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
 // ---- event bus ----
 
 type event struct {
-	Kind      string `json:"kind"`
+	Kind       string `json:"kind"`
 	InstanceID string `json:"instanceId,omitempty"`
-	Online    bool   `json:"online,omitempty"`
+	Online     bool   `json:"online,omitempty"`
 }
 
 type broadcaster struct {

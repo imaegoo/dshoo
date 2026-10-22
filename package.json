@@ -11,6 +11,7 @@
     "server:build": "cd src/server && go build -o bin/dshoo ./cmd/dshoo",
     "server:test": "cd src/server && go test ./...",
     "server:vet": "cd src/server && go vet ./...",
+    "test": "node --test test/plugin.test.mjs",
     "e2e": "node test/e2e.mjs",
     "ui-check": "node test/browser-check.mjs",
     "ui-check:plugin": "node test/plugin-ui-check.mjs"

@@ -70,6 +70,9 @@ jobs:
       - name: build
         run: pnpm build
 
+      - name: test
+        run: pnpm test
+
       # The harness loads this bundle as a classic script, so a stray
       # `import`/`export` would only surface in the browser at runtime.
       - name: check browser bundle syntax

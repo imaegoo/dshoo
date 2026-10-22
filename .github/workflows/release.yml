@@ -9,9 +9,6 @@ permissions:
   packages: write
   id-token: write
 
-env:
-  IMAGE: ghcr.io/${{ github.repository }}
-
 jobs:
   # The tag is the version: x.y.z, no prefix. Everything downstream reads it
   # from here, so a malformed tag fails before anything is published.
@@ -149,8 +146,8 @@ jobs:
           build-args: |
             VERSION=${{ needs.version.outputs.version }}
           tags: |
-            ${{ env.IMAGE }}:${{ needs.version.outputs.version }}
-            ${{ env.IMAGE }}:latest
+            ghcr.io/${{ github.repository }}:${{ needs.version.outputs.version }}
+            ghcr.io/${{ github.repository }}:latest
           labels: |
             org.opencontainers.image.title=dshoo
             org.opencontainers.image.description=Remote control plane for DeepSeek Harness instances

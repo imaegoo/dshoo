@@ -139,7 +139,7 @@ func (s *Server) proxyHTTP(w http.ResponseWriter, r *http.Request, tun *tunnel.T
 	go s.pumpRequestBody(ctx, r, tun, streamID)
 
 	var (
-		started bool
+		started  bool
 		finished bool
 	)
 	for {
