@@ -39,7 +39,15 @@
         <span class="summary" id="summary">正在加载…</span>
       </div>
 
-      <div class="grid" id="grid"></div>
+      <section class="group" id="online-group" hidden>
+        <h2 class="group-head"><span class="dot on" aria-hidden="true"></span>在线<span class="count" id="online-count">0</span></h2>
+        <div class="grid" id="online-grid"></div>
+      </section>
+
+      <section class="group" id="offline-group" hidden>
+        <h2 class="group-head"><span class="dot" aria-hidden="true"></span>离线<span class="count" id="offline-count">0</span></h2>
+        <div class="grid" id="offline-grid"></div>
+      </section>
 
       <div class="empty" id="empty" hidden>
         <span class="brand-mark" aria-hidden="true">

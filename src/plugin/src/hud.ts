@@ -218,7 +218,9 @@ function installHud(): void {
     applyPosition(animate);
   };
 
-  const storageKey = (): string => `dshoo-hud:${location.pathname.replace(/\/+$/u, "")}`;
+  // One position for every instance: dragging the pill on one page should
+  // place it the same way on the next.
+  const storageKey = (): string => "dshoo-hud-position";
 
   const savePosition = (): void => {
     try {

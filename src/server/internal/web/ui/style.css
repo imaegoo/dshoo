@@ -361,6 +361,26 @@ body.app { background: var(--sidebar-bg); }
   color: var(--label-3);
 }
 
+/* Online and offline are separate groups with their own count. */
+.group { margin-bottom: 24px; }
+.group:last-of-type { margin-bottom: 0; }
+
+.group-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--label-2);
+}
+
+.group-head .count {
+  margin-left: 1px;
+  color: var(--label-3);
+  font-variant-numeric: tabular-nums;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

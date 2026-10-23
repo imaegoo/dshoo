@@ -1,10 +1,15 @@
 "use strict";
 
-/* Instance list: one card per instance, three per row. Clicking a card opens
-   that instance's own page; the harness UI itself is loaded there, not here. */
+/* Instance list: online and offline groups, one card per instance. Clicking a
+   card opens that instance's own page; the harness UI is loaded there. */
 
 const els = {
-  grid: document.getElementById("grid"),
+  onlineGrid: document.getElementById("online-grid"),
+  offlineGrid: document.getElementById("offline-grid"),
+  onlineGroup: document.getElementById("online-group"),
+  offlineGroup: document.getElementById("offline-group"),
+  onlineCount: document.getElementById("online-count"),
+  offlineCount: document.getElementById("offline-count"),
   summary: document.getElementById("summary"),
   empty: document.getElementById("empty"),
   who: document.getElementById("who-name"),
@@ -126,17 +131,27 @@ function card(item) {
 }
 
 function render() {
-  els.grid.textContent = "";
-  const online = instances.filter((item) => item.online).length;
+  els.onlineGrid.textContent = "";
+  els.offlineGrid.textContent = "";
+  const online = instances.filter((item) => item.online);
+  const offline = instances.filter((item) => !item.online);
 
   if (instances.length === 0) {
-    els.summary.textContent = "暂无实例";
+    els.summary.textContent = "";
+    els.onlineGroup.hidden = true;
+    els.offlineGroup.hidden = true;
     els.empty.hidden = false;
     return;
   }
+
   els.empty.hidden = true;
-  els.summary.textContent = `${online} 在线 / 共 ${instances.length}`;
-  for (const item of instances) els.grid.append(card(item));
+  els.summary.textContent = "";
+  els.onlineGroup.hidden = online.length === 0;
+  els.offlineGroup.hidden = offline.length === 0;
+  els.onlineCount.textContent = String(online.length);
+  els.offlineCount.textContent = String(offline.length);
+  for (const item of online) els.onlineGrid.append(card(item));
+  for (const item of offline) els.offlineGrid.append(card(item));
 }
 
 async function load() {
