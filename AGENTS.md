@@ -18,6 +18,7 @@ src/plugin/          dsh 插件（npm 包名 dshoo，TS → lib/）
   src/bridge.ts      帧 ⇄ 本机 dsh 的 HTTP/WebSocket 代理
   src/harness.ts     本机 GUI 端口与登录 cookie
   src/config.ts      ~/.dsh/dshoo.json
+  src/version.ts     从 package.json 读插件版本（hello 与设置页上报）
   src/client.ts      设置页「远程访问」（浏览器侧，普通 script）
   scripts/postbuild.mjs  去掉 tsc 给 client.js 加的 export {}
 test/               端到端与真实浏览器检查脚本
@@ -69,6 +70,7 @@ node test/plugin-ui-check.mjs "http://127.0.0.1:<dsh端口>/?token=<启动 token
 **离线与重连**：网关常给 WebSocket 加最大存活时间（例如 5 分钟），所以「断线」是常态而非异常。处理方式：
 
 - 插件侧：连接存活超过 2 秒才算「健康」。健康连接被掐断后 **1 秒**重试（最多连续 3 次快速重试），其余情况仍是 **10 秒**；`enabled` 为 `false`（用户点过断开）时不自动连接。
+- 插件侧探活：连上以后每 **10 秒**发一个 WebSocket ping，**5 秒**内没有 pong 就 `terminate()` 并重连。Wi-Fi 掉线、休眠或 NAT 映射过期时，本机 socket 会一直停在 ESTABLISHED 且没有任何 close 事件，不主动探活就会永远显示「已连接」。最坏 15 秒发现，仍在服务端 30 秒宽限内，所以列表不会闪一下离线。
 - 每次新建 socket 前调用 `Bridge.reset()`：新连接的流 id 从 1 重新开始，旧连接残留的帧不能落到新连接上。
 - 服务端侧：断开后先等 **30 秒宽限**（`offlineGrace`）再标记离线；宽限期内重连则实例始终显示在线、SSE 不推离线；被新隧道顶掉的旧隧道不触发离线；宽限期内的浏览器请求会等待最多 3 秒等隧道回来，而不是直接 502。
 - 服务端启动时把所有实例置为离线。
