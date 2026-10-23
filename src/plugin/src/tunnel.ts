@@ -21,6 +21,14 @@ export interface TunnelHandlers {
   onDial?(): void;
 }
 
+/** Keepalive tuning, overridable so tests do not have to wait ten seconds. */
+export interface TunnelOptions {
+  /** Interval between keepalive pings, in milliseconds. */
+  heartbeatInterval?: number;
+  /** How long one ping may stay unanswered before the socket is dropped. */
+  heartbeatTimeout?: number;
+}
+
 /** Retry cadence while a connection cannot be established. */
 const RETRY_DELAY = 10_000;
 /** A connection that served for this long earns an immediate retry when it drops. */
@@ -29,6 +37,10 @@ const HEALTHY_CONNECTION_MS = 2_000;
 const QUICK_RETRY_DELAY = 1_000;
 /** Consecutive quick retries allowed before falling back to the steady cadence. */
 const MAX_QUICK_RETRIES = 3;
+/** Interval between keepalive pings on a live tunnel. */
+const HEARTBEAT_INTERVAL = 10_000;
+/** How long a keepalive ping may stay unanswered before the socket is dropped. */
+const HEARTBEAT_TIMEOUT = 5_000;
 
 /**
  * Wait before the next dial.
@@ -68,6 +80,10 @@ export class TunnelClient {
   private wasHealthy = false;
   /** Consecutive quick retries spent since the last healthy connection. */
   private quickAttempts = 0;
+  /** Timer that keeps proving the socket is still there. */
+  private heartbeatTimer?: NodeJS.Timeout;
+  /** Why the watchdog dropped the socket, shown instead of a generic code. */
+  private closeReason = "";
 
   constructor(
     private readonly url: string,
@@ -75,6 +91,7 @@ export class TunnelClient {
     private readonly password: string,
     private readonly handlers: TunnelHandlers,
     private readonly log: (message: string) => void,
+    private readonly options: TunnelOptions = {},
   ) {}
 
   /** Server-assigned instance id, available after the first successful connect. */
@@ -97,6 +114,7 @@ export class TunnelClient {
   stop(): void {
     this.stopped = true;
     this.attempt = 0;
+    this.stopHeartbeat();
     if (this.reconnectTimer !== undefined) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = undefined;
@@ -173,6 +191,7 @@ export class TunnelClient {
     socket.on("close", (code: number) => {
       clearTimeout(helloTimeout);
       if (this.socket !== socket) return;
+      this.stopHeartbeat();
       this.socket = undefined;
       this.ack = undefined;
       const lived = this.connectedAt === undefined ? 0 : Date.now() - this.connectedAt;
@@ -180,7 +199,9 @@ export class TunnelClient {
       this.wasHealthy = lived >= HEALTHY_CONNECTION_MS;
       // A connection that lasted resets the flapping guard.
       if (this.wasHealthy) this.quickAttempts = 0;
-      this.detail = code === 1006 ? "连接被中断" : `连接关闭（${code}）`;
+      const reason = this.closeReason;
+      this.closeReason = "";
+      this.detail = reason !== "" ? reason : code === 1006 ? "连接被中断" : `连接关闭（${code}）`;
       this.scheduleReconnect();
     });
 
@@ -221,7 +242,64 @@ export class TunnelClient {
       this.attempt = 0;
       this.connectedAt = Date.now();
       this.detail = "";
+      this.startHeartbeat();
       this.handlers.onState("connected");
+    }
+  }
+
+  /**
+   * Start proving that the socket still reaches the server.
+   *
+   * A dead peer is not always reported: when a laptop's Wi-Fi drops, or a NAT
+   * mapping expires, the local socket can stay ESTABLISHED forever while every
+   * packet is silently dropped. The server closes its side after its own ping
+   * times out, but this process would keep showing "connected" until something
+   * tried to write. A ping every few seconds turns that into a prompt error.
+   */
+  private startHeartbeat(): void {
+    this.stopHeartbeat();
+    const interval = this.options.heartbeatInterval ?? HEARTBEAT_INTERVAL;
+    this.heartbeatTimer = setInterval(() => this.probe(), interval);
+    this.heartbeatTimer.unref?.();
+  }
+
+  /** Stop the keepalive timer; safe to call when none is running. */
+  private stopHeartbeat(): void {
+    if (this.heartbeatTimer !== undefined) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = undefined;
+    }
+  }
+
+  /** Send one ping and drop the socket when the pong does not come back. */
+  private probe(): void {
+    const socket = this.socket;
+    if (socket === undefined || socket.readyState !== WebSocket.OPEN) return;
+    const timeout = this.options.heartbeatTimeout ?? HEARTBEAT_TIMEOUT;
+    let settled = false;
+    const onPong = (): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(deadline);
+      socket.off("pong", onPong);
+    };
+    const deadline = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      socket.off("pong", onPong);
+      if (this.socket !== socket) return;
+      this.closeReason = "服务器长时间没有响应";
+      this.log("keepalive timed out; dropping the tunnel");
+      // terminate() rather than close(): a half-open socket would never
+      // complete the closing handshake.
+      socket.terminate();
+    }, timeout);
+    socket.once("pong", onPong);
+    try {
+      socket.ping();
+    } catch {
+      onPong();
+      socket.terminate();
     }
   }
 

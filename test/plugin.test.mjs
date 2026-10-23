@@ -1,10 +1,15 @@
 // Unit tests for the plugin's pure helpers, run against the built output so the
 // package that ships is what gets tested.
 import assert from "node:assert/strict";
+import { once } from "node:events";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
+import { WebSocketServer } from "ws";
+
 import { normalizeServer, tunnelUrl } from "../src/plugin/lib/config.js";
-import { retryDelayMs } from "../src/plugin/lib/tunnel.js";
+import { retryDelayMs, TunnelClient } from "../src/plugin/lib/tunnel.js";
+import { pluginVersion } from "../src/plugin/lib/version.js";
 
 test("normalizeServer keeps an explicit origin", () => {
   assert.equal(normalizeServer("https://fleet.example.com"), "https://fleet.example.com");
@@ -50,4 +55,62 @@ test("retry stays at ten seconds otherwise", () => {
   assert.equal(retryDelayMs(false, 0), 10_000);
   // Quick retries exhausted: the connection keeps dropping straight away.
   assert.equal(retryDelayMs(true, 3), 10_000);
+});
+
+test("reports the version from the package manifest", () => {
+  const manifest = JSON.parse(readFileSync(new URL("../src/plugin/package.json", import.meta.url), "utf8"));
+  assert.equal(pluginVersion, manifest.version);
+});
+
+test("a tunnel whose pongs stop arriving drops the socket and reconnects", async () => {
+  // A half-open socket looks healthy to the OS: writes succeed into the void
+  // and no close event ever arrives. The keepalive must notice.
+  const server = new WebSocketServer({ port: 0, host: "127.0.0.1" });
+  await once(server, "listening");
+  const { port } = server.address();
+  let connections = 0;
+  const states = [];
+  server.on("connection", (socket) => {
+    connections += 1;
+    socket.send(JSON.stringify({
+      type: "hello-ack",
+      instanceId: "test",
+      prefix: "/i/test",
+      serverTime: Date.now(),
+    }));
+    // Stop reading, so pings pile up unanswered while the socket stays open.
+    socket.pause();
+  });
+
+  const client = new TunnelClient(`ws://127.0.0.1:${port}/tunnel`, "user", "pass", {
+    hello: () => ({
+      key: "test-key",
+      name: "test",
+      hostname: "test",
+      os: "win32",
+      arch: "x64",
+      dshVersion: "0",
+      pid: process.pid,
+      guiPort: 0,
+      pluginVersion: "0",
+    }),
+    onFrame: () => {},
+    onState: (state) => {
+      states.push(state);
+    },
+  }, () => {}, { heartbeatInterval: 2_500, heartbeatTimeout: 150 });
+
+  try {
+    client.start();
+    const deadline = Date.now() + 10_000;
+    while (connections < 2 && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    assert.ok(connections >= 2, `expected a reconnect, saw ${connections} connection(s)`);
+    assert.deepEqual(states.slice(0, 3), ["connecting", "connected", "reconnecting"]);
+  } finally {
+    client.stop();
+    for (const socket of server.clients) socket.terminate();
+    server.close();
+  }
 });

@@ -12,6 +12,7 @@ import {
 import { LocalHarness, harnessVersion, type HarnessContext } from "./harness.js";
 import type { HelloMeta } from "./protocol.js";
 import { TunnelClient, type TunnelState } from "./tunnel.js";
+import { pluginVersion } from "./version.js";
 
 /** Minimal shape of an incoming Node request; the harness passes the real one. */
 interface RequestLike {
@@ -117,7 +118,7 @@ export function apply(ctx: PluginContext): void {
       dshVersion: harnessVersion(),
       pid: process.pid,
       guiPort: harness.port() ?? 0,
-      pluginVersion: "0.1.0",
+      pluginVersion,
     };
 
     const client: TunnelClient = new TunnelClient(url, config.username, config.password, {
@@ -196,7 +197,7 @@ export function apply(ctx: PluginContext): void {
         platform: platform(),
         arch: arch(),
         dshVersion: harnessVersion(),
-        pluginVersion: "0.1.0",
+        pluginVersion,
       },
     };
   }
