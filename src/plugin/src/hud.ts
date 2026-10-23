@@ -160,10 +160,14 @@ function installHud(): void {
   if (hud === null || num === null || lat === null || back === null) return;
   document.body.appendChild(host);
 
-  // ---- position: 16px from the nearest edge after every drag --------------
+  // ---- position: 16px from the anchored edges, remembered per instance ----
+  type HAnchor = "left" | "right";
+  type VAnchor = "top" | "bottom";
+
   let posX = 16;
   let posY = 16;
-  let edge: "left" | "right" | "top" | "bottom" = "left";
+  let anchorH: HAnchor | null = "left";
+  let anchorV: VAnchor | null = "top";
   let dragging = false;
   let pointer = -1;
   let grabX = 0;
@@ -176,20 +180,69 @@ function installHud(): void {
     host.style.transform = `translate3d(${String(posX)}px, ${String(posY)}px, 0)`;
   };
 
-  /** Keep the pill 16px from the edge it snapped to when its width changes. */
-  const keepAnchored = (): void => {
-    if (dragging) return;
+  const clampPosition = (): void => {
     const rect = hud.getBoundingClientRect();
-    if (edge === "right") {
-      posX = Math.max(16, window.innerWidth - rect.width - 16);
-      applyPosition(true);
-    } else if (edge === "bottom") {
-      posY = Math.max(16, window.innerHeight - rect.height - 16);
-      applyPosition(true);
+    posX = Math.min(Math.max(posX, 0), Math.max(0, window.innerWidth - rect.width));
+    posY = Math.min(Math.max(posY, 0), Math.max(0, window.innerHeight - rect.height));
+  };
+
+  /** Place the pill 16px from the edges it is anchored to. */
+  const placeAnchored = (animate: boolean): void => {
+    const rect = hud.getBoundingClientRect();
+    if (anchorH === "left") posX = 16;
+    else if (anchorH === "right") posX = window.innerWidth - rect.width - 16;
+    if (anchorV === "top") posY = 16;
+    else if (anchorV === "bottom") posY = window.innerHeight - rect.height - 16;
+    clampPosition();
+    applyPosition(animate);
+  };
+
+  const storageKey = (): string => `dshoo-hud:${location.pathname.replace(/\/+$/u, "")}`;
+
+  const savePosition = (): void => {
+    try {
+      localStorage.setItem(storageKey(), JSON.stringify({
+        h: anchorH,
+        v: anchorV,
+        x: Math.round(posX),
+        y: Math.round(posY),
+      }));
+    } catch {
+      // Private modes and disabled storage are not worth failing over.
     }
   };
 
-  /** Snap to the closest edge, leaving 16px, and animate the move. */
+  /** Restore a previous drag; returns false when there is nothing stored. */
+  const restorePosition = (): boolean => {
+    let raw: string | null = null;
+    try {
+      raw = localStorage.getItem(storageKey());
+    } catch {
+      return false;
+    }
+    if (raw === null || raw === "") return false;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return false;
+    }
+    if (typeof parsed !== "object" || parsed === null) return false;
+    const stored = parsed as { h?: unknown; v?: unknown; x?: unknown; y?: unknown };
+    anchorH = stored.h === "left" || stored.h === "right" ? stored.h : null;
+    anchorV = stored.v === "top" || stored.v === "bottom" ? stored.v : null;
+    if (typeof stored.x === "number" && Number.isFinite(stored.x)) posX = stored.x;
+    if (typeof stored.y === "number" && Number.isFinite(stored.y)) posY = stored.y;
+    return true;
+  };
+
+  /** Keep the pill 16px from the edge it snapped to when its width changes. */
+  const keepAnchored = (): void => {
+    if (dragging) return;
+    if (anchorH === "right" || anchorV === "bottom") placeAnchored(true);
+  };
+
+  /** Snap to the closest edge, or to both edges near a corner, then animate. */
   const settle = (): void => {
     const rect = hud.getBoundingClientRect();
     const width = rect.width;
@@ -199,23 +252,47 @@ function installHud(): void {
     const dTop = posY;
     const dBottom = window.innerHeight - height - posY;
     const nearest = Math.min(dLeft, dRight, dTop, dBottom);
+    anchorH = null;
+    anchorV = null;
     if (nearest === dLeft) {
-      edge = "left";
+      anchorH = "left";
       posX = 16;
     } else if (nearest === dRight) {
-      edge = "right";
+      anchorH = "right";
       posX = window.innerWidth - width - 16;
     } else if (nearest === dTop) {
-      edge = "top";
+      anchorV = "top";
       posY = 16;
     } else {
-      edge = "bottom";
+      anchorV = "bottom";
       posY = window.innerHeight - height - 16;
     }
-    posX = Math.min(Math.max(posX, 0), Math.max(0, window.innerWidth - width));
-    posY = Math.min(Math.max(posY, 0), Math.max(0, window.innerHeight - height));
+    // Dropped near a corner: the other axis is closer than the gap too, so
+    // snap it as well and leave 16px on both sides instead of under 16 on one.
+    if (anchorH === null) {
+      if (posX < 16) {
+        anchorH = "left";
+        posX = 16;
+      } else if (window.innerWidth - width - posX < 16) {
+        anchorH = "right";
+        posX = window.innerWidth - width - 16;
+      }
+    } else if (anchorV === null) {
+      if (posY < 16) {
+        anchorV = "top";
+        posY = 16;
+      } else if (window.innerHeight - height - posY < 16) {
+        anchorV = "bottom";
+        posY = window.innerHeight - height - 16;
+      }
+    }
+    clampPosition();
     applyPosition(true);
+    savePosition();
   };
+
+  // A previous drag wins over the default top-left corner.
+  if (restorePosition()) placeAnchored(false);
 
   const samples: number[] = [];
   let failures = 0;
@@ -370,4 +447,16 @@ function installHud(): void {
   };
   hud.addEventListener("pointerup", release);
   hud.addEventListener("pointercancel", release);
+
+  // Keep a right/bottom anchored pill 16px from that edge when the window
+  // changes size (rotation, desktop resize, mobile browser bars).
+  window.addEventListener("resize", () => {
+    if (dragging) return;
+    if (anchorH === "right" || anchorV === "bottom") {
+      placeAnchored(false);
+    } else {
+      clampPosition();
+      applyPosition(false);
+    }
+  });
 }
