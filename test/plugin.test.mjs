@@ -8,8 +8,9 @@ import test from "node:test";
 
 import { WebSocketServer } from "ws";
 
-import { Bridge, hudScript, rewriteIndex } from "../src/plugin/lib/bridge.js";
+import { Bridge, rewriteIndex } from "../src/plugin/lib/bridge.js";
 import { normalizeServer, tunnelUrl } from "../src/plugin/lib/config.js";
+import { hudScript } from "../src/plugin/lib/hud.js";
 import {
   decodeFrame,
   FrameReqEnd,

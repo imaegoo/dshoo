@@ -10,7 +10,8 @@ import { createServer } from "node:http";
 
 import { chromium, devices } from "playwright-core";
 
-import { hudScript, rewriteIndex } from "../src/plugin/lib/bridge.js";
+import { rewriteIndex } from "../src/plugin/lib/bridge.js";
+import { hudScript } from "../src/plugin/lib/hud.js";
 
 const EDGE = process.env.DSHOO_BROWSER
   ?? "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
@@ -101,6 +102,53 @@ check("back points at the list", await page.locator(".back").getAttribute("href"
 check("back label is visible on desktop", hud.backText);
 await page.screenshot({ path: `${shots}hud-desktop.png` });
 
+// --- dragging ------------------------------------------------------------
+const viewport = page.viewportSize();
+const grab = await page.locator(".hud").boundingBox();
+await page.mouse.move(grab.x + grab.width - 22, grab.y + grab.height / 2);
+await page.mouse.down();
+await page.mouse.move(viewport.width - 220, 420, { steps: 14 });
+
+// Record the host's x while the pill animates towards its edge.
+await page.evaluate(() => {
+  window.__hudSamples = [];
+  const host = document.getElementById("dshoo-hud");
+  const started = performance.now();
+  const tick = () => {
+    window.__hudSamples.push(host.getBoundingClientRect().x);
+    if (performance.now() - started < 500) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+});
+await page.mouse.up();
+await page.waitForTimeout(650);
+
+const dragged = await page.locator(".hud").boundingBox();
+const rightX = viewport.width - dragged.width - 16;
+const samples = await page.evaluate(() => window.__hudSamples);
+check("drag snaps 16px from the nearest edge", Math.abs(dragged.x - rightX) <= 1,
+  `${dragged.x.toFixed(1)} vs ${rightX.toFixed(1)}`);
+check("snap leaves the other axis alone", dragged.y > 100, `y ${Math.round(dragged.y)}`);
+check("snap is animated, not a cut", samples.some((x) => x > 16 && x < rightX - 1), `${samples.length} frames`);
+
+// Dragging must start only on the latency half: the back button keeps its click.
+const beforeBack = await page.locator("#dshoo-hud").boundingBox();
+await page.evaluate(() => {
+  const host = document.getElementById("dshoo-hud");
+  const back = host.shadowRoot.querySelector(".back");
+  const rect = back.getBoundingClientRect();
+  const base = { bubbles: true, composed: true, pointerId: 11, pointerType: "mouse", button: 0 };
+  back.dispatchEvent(new PointerEvent("pointerdown", { ...base, clientX: rect.x + 4, clientY: rect.y + 4 }));
+  back.dispatchEvent(new PointerEvent("pointermove", { ...base, clientX: rect.x + 140, clientY: rect.y + 120 }));
+  back.dispatchEvent(new PointerEvent("pointerup", { ...base, clientX: rect.x + 140, clientY: rect.y + 120 }));
+});
+await page.waitForTimeout(400);
+const afterBack = await page.locator("#dshoo-hud").boundingBox();
+check("the back button area never drags",
+  Math.abs(afterBack.x - beforeBack.x) <= 1 && Math.abs(afterBack.y - beforeBack.y) <= 1,
+  `${afterBack.x.toFixed(0)}, ${afterBack.y.toFixed(0)}`);
+await page.screenshot({ path: `${shots}hud-dragged.png` });
+
 pingDelay = 200;
 await page.reload({ waitUntil: "networkidle" });
 await waitForNumber(page);
@@ -129,6 +177,18 @@ check("phone keeps the pill", hud.visible);
 check("phone drops the back label", !hud.backText);
 check("phone drops the unit", !hud.unit);
 check("phone pill is compact", (hud.box?.width ?? 0) < 120, `${Math.round(hud.box?.width ?? 0)}px wide`);
+
+// Touch screens drag with the same pointer handlers.
+const phoneGrab = await mobile.locator(".hud").boundingBox();
+await mobile.mouse.move(phoneGrab.x + phoneGrab.width - 18, phoneGrab.y + phoneGrab.height / 2);
+await mobile.mouse.down();
+await mobile.mouse.move(180, 640, { steps: 12 });
+await mobile.mouse.up();
+await mobile.waitForTimeout(450);
+const phoneAfter = await mobile.locator(".hud").boundingBox();
+check("phone drag snaps 16px from the left edge", Math.abs(phoneAfter.x - 16) <= 1,
+  `x ${phoneAfter.x.toFixed(1)}`);
+check("phone drag keeps the drop height", phoneAfter.y > 300, `y ${Math.round(phoneAfter.y)}`);
 await mobile.screenshot({ path: `${shots}hud-phone.png` });
 await phone.close();
 

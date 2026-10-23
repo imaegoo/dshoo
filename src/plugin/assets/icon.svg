@@ -1,8 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
-  <rect width="32" height="32" rx="8" fill="#4D6BFE"/>
-  <g fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round">
-    <path d="M11 21.5c0-4.4 3.6-8 8-8"/>
-    <path d="M8.5 24c0-6.4 5.1-11.5 11.5-11.5"/>
-    <circle cx="22" cy="11" r="2.2" fill="#fff" stroke="none"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6C97FF"/>
+      <stop offset="1" stop-color="#335FD4"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="15" fill="url(#tile)"/>
+  <g stroke="#fff" stroke-width="4.2" stroke-linecap="round">
+    <path d="M32 13.5 15 47.5M32 13.5 49 47.5M15 47.5h34"/>
+  </g>
+  <g fill="#fff">
+    <circle cx="32" cy="13.5" r="5.6"/>
+    <circle cx="15" cy="47.5" r="5.6"/>
+    <circle cx="49" cy="47.5" r="5.6"/>
   </g>
 </svg>
