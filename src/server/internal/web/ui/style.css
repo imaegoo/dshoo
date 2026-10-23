@@ -493,6 +493,9 @@ body.app { background: var(--sidebar-bg); }
 }
 
 .card-wrap:hover > .remove { display: inline-block; }
+/* Keyboards and touch screens get the same affordance: a phone has no hover,
+   and a focused card should reveal its action without a pointer. */
+.card-wrap:focus-within > .remove { display: inline-block; }
 .card-wrap > .remove:hover { background: var(--hover-danger); color: var(--error); border-color: transparent; }
 
 /* ---------- empty state ---------- */
@@ -563,7 +566,8 @@ body.app { background: var(--sidebar-bg); }
 .toast {
   position: fixed;
   left: 50%;
-  bottom: 22px;
+  /* Keep the toast above the home indicator on phones. */
+  bottom: calc(22px + env(safe-area-inset-bottom, 0px));
   transform: translateX(-50%);
   padding: 8px 14px;
   font-size: 12.5px;
@@ -579,13 +583,23 @@ body.app { background: var(--sidebar-bg); }
 
 .toast.show { opacity: 1; }
 
-/* Rendered inside the instance frame when the tunnel is down. */
-body.embed-body { background: var(--bg); }
+/* Rendered when the tunnel is down and the instance cannot be reached. It is a
+   whole page of its own: the list hands the browser straight to /i/<id>/, so
+   this page replaces the list instead of sitting inside its chrome. */
+body.embed-body {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  /* dvh tracks the browser bars on phones; vh keeps older engines sane. */
+  min-height: 100dvh;
+  padding: 24px 20px;
+  background: var(--bg);
+}
 
 .embed-error {
+  width: 100%;
   max-width: 420px;
-  margin: 16vh auto 0;
-  padding: 0 24px;
+  margin: 0;
   text-align: center;
 }
 
@@ -632,4 +646,12 @@ body.embed-body { background: var(--bg); }
   .auth-card { padding: 22px 18px; }
   .topbar { padding: 0 14px; }
   .topbar .who span:last-child { display: none; }
+}
+
+/* Phones have no hover state, so the corner action has to be visible without
+   one; it stays a quiet secondary button so the card still reads as a link. */
+@media (hover: none) {
+  .card-wrap > .remove { display: inline-block; }
+  .card:hover,
+  .card-wrap:hover > .card { transform: none; }
 }

@@ -468,7 +468,10 @@ func (s *Server) proxyErrorPage(w http.ResponseWriter, status int, title, detail
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(status)
 	fmt.Fprintf(w, `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
-<title>%s</title><link rel="stylesheet" href="/static/style.css"></head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>%s</title><link rel="stylesheet" href="/static/style.css">
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml"></head>
 <body class="embed-body"><div class="embed-error"><div class="embed-error-mark">!</div>
 <h1>%s</h1><p>%s</p><a class="btn" href="/">返回实例列表</a></div></body></html>`, title, title, detail)
 }

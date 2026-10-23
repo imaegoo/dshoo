@@ -45,17 +45,19 @@ dsh plugin --profile web add "$PWD/src/plugin"
 
 ## 端到端验证
 
-三个脚本都需要一台在跑的服务端；浏览器脚本还需要本机 Edge（可用 `DSHOO_BROWSER` 指定其它 Chromium）。
+四个脚本都需要一台在跑的服务端；浏览器脚本还需要本机 Edge（可用 `DSHOO_BROWSER` 指定其它 Chromium）。
 
 ```sh
 node test/e2e.mjs http://127.0.0.1:9830 admin <密码>
 node test/browser-check.mjs                       # 截图写到 .run/shots/
 node test/plugin-ui-check.mjs "http://127.0.0.1:<dsh端口>/?token=<启动 token>"
+node test/mobile-check.mjs http://127.0.0.1:9830 admin <密码>
 ```
 
 - `e2e.mjs`：首次初始化（或 409）、登录、实例列表、实例首页、`/plugins/...` 前端模块、`/api/remote.mux` WebSocket。
 - `browser-check.mjs`：未登录访问必须落到 `/login`；登录后点卡片直接进入 `/i/<id>/`，dsh 完整启动且无控制台报错。
 - `plugin-ui-check.mjs`：直接打开 dsh GUI，断言「远程访问」入口注册、字段与连接状态渲染、密码输入不留存、重开设置页回填。
+- `mobile-check.mjs`：用 Pixel 7 视口跑登录、实例列表与离线页；自己建一条隧道再等它掉线，断言页面用手机视口渲染（980px 回退会直接失败）、不横向溢出、触摸设备上能点到「移除」。跑完删掉自己建的实例。
 
 ## 工作原理
 
@@ -87,6 +89,7 @@ node test/plugin-ui-check.mjs "http://127.0.0.1:<dsh端口>/?token=<启动 token
 - 隧道帧的载荷上限：服务端 `SetReadLimit(64MB)`，插件 `maxPayload` 同值；改动其一必须同步另一个。
 - 代理会剥掉实例响应的 CSP / `X-Frame-Options` 与 `Set-Cookie`，并且不转发浏览器的 cookie 给实例——这是「同源内嵌 + 插件自持凭据」的前提，改动前先想清楚。
 - Go 版本：`src/server/go.mod` 的 `go` 指令钉精确补丁版本（CI 与发布二进制读它），`src/server/Dockerfile` 浮在同一个次版本线上（`golang:1.27-alpine`），以便自动吃到补丁。升级小版本时两处一起改。
+- 移动端：服务端每张页面都必须带 `<meta name="viewport" content="width=device-width, initial-scale=1">`，漏了会让手机按 980px 排版（文字缩成一条），`test/mobile-check.mjs` 会直接报出来。小屏断点是 `620px`；触摸设备没有 hover，卡片上的「移除」靠 `@media (hover: none)` 常显，键盘用户靠 `:focus-within`。
 
 ## 发布
 
