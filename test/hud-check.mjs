@@ -149,6 +149,38 @@ check("the back button area never drags",
   `${afterBack.x.toFixed(0)}, ${afterBack.y.toFixed(0)}`);
 await page.screenshot({ path: `${shots}hud-dragged.png` });
 
+// Resizing keeps a right-anchored pill 16px from the new right edge.
+await page.setViewportSize({ width: 1100, height: 700 });
+await page.waitForTimeout(150);
+const resized = await page.locator("#dshoo-hud").boundingBox();
+const narrowX = 1100 - resized.width - 16;
+check("resize re-pins the right edge", Math.abs(resized.x - narrowX) <= 1,
+  `${resized.x.toFixed(1)} vs ${narrowX.toFixed(1)}`);
+check("resize leaves the drop height alone", Math.abs(resized.y - dragged.y) <= 2,
+  `y ${resized.y.toFixed(0)}`);
+await page.setViewportSize({ width: viewport.width, height: 900 });
+await page.waitForTimeout(150);
+
+// The position is remembered per instance.
+await page.reload({ waitUntil: "networkidle" });
+await waitForNumber(page);
+const restored = await page.locator("#dshoo-hud").boundingBox();
+check("position survives a reload",
+  Math.abs(restored.x - (viewport.width - restored.width - 16)) <= 1,
+  `x ${restored.x.toFixed(1)}`);
+
+// Dropping within 16px of a corner snaps both axes, not just one.
+const cornerGrab = await page.locator(".hud").boundingBox();
+await page.mouse.move(cornerGrab.x + cornerGrab.width - 22, cornerGrab.y + cornerGrab.height / 2);
+await page.mouse.down();
+await page.mouse.move(6, 6, { steps: 10 });
+await page.mouse.up();
+await page.waitForTimeout(450);
+const corner = await page.locator("#dshoo-hud").boundingBox();
+check("a corner drop leaves 16px on both edges",
+  Math.abs(corner.x - 16) <= 1 && Math.abs(corner.y - 16) <= 1,
+  `${corner.x.toFixed(1)}, ${corner.y.toFixed(1)}`);
+
 pingDelay = 200;
 await page.reload({ waitUntil: "networkidle" });
 await waitForNumber(page);
