@@ -24,6 +24,27 @@ export function injectHud(html: string, prefix: string): string {
 }
 
 /**
+ * Declare the document language before the harness boots.
+ *
+ * The harness ships `<html lang="en">` and only corrects it after its client
+ * bundle runs. Chrome reads the first paint and offers to translate the whole
+ * app from English before that happens. The harness renders Chinese for Chinese
+ * browsers and English for everyone else, so mirror that here using the request
+ * that fetched the page.
+ */
+export function withDocumentLanguage(html: string, acceptLanguage: string): string {
+  const primary = (acceptLanguage.split(",")[0] ?? "").split(";")[0]?.trim() ?? "";
+  if (primary === "") return html;
+  const lang = primary.toLowerCase().startsWith("zh") ? "zh-CN" : "en";
+  return html.replace(/<html\b[^>]*>/iu, (tag) => {
+    if (/\slang\s*=\s*("[^"]*"|'[^']*')/iu.test(tag)) {
+      return tag.replace(/\slang\s*=\s*("[^"]*"|'[^']*')/iu, ` lang="${lang}"`);
+    }
+    return tag.replace(/<html\b/iu, `<html lang="${lang}"`);
+  });
+}
+
+/**
  * Back button and latency pill for pages opened through a dshoo server.
  *
  * This function is serialised with `toString()` and runs in the browser, so it
