@@ -1,6 +1,7 @@
 import WebSocket from "ws";
 
 import { decodeFrame, encodeFrame, type Frame, type HelloAck, type HelloMeta } from "./protocol.js";
+import { pluginVersion } from "./version.js";
 
 /** Observable phases of the plugin's outbound tunnel. */
 export type TunnelState = "idle" | "connecting" | "connected" | "reconnecting" | "error";
@@ -82,6 +83,8 @@ export class TunnelClient {
   private quickAttempts = 0;
   /** Timer that keeps proving the socket is still there. */
   private heartbeatTimer?: NodeJS.Timeout;
+  /** Deadline for the server to acknowledge a fresh socket. */
+  private helloTimeout?: NodeJS.Timeout;
   /** Why the watchdog dropped the socket, shown instead of a generic code. */
   private closeReason = "";
 
@@ -115,6 +118,7 @@ export class TunnelClient {
     this.stopped = true;
     this.attempt = 0;
     this.stopHeartbeat();
+    this.clearHello();
     if (this.reconnectTimer !== undefined) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = undefined;
@@ -123,9 +127,14 @@ export class TunnelClient {
     this.socket = undefined;
     this.ack = undefined;
     if (socket !== undefined) {
+      // Aborting a dial makes `ws` emit "WebSocket was closed before the
+      // connection was established"; without a listener that error would
+      // surface as an uncaught exception in the harness host.
       socket.removeAllListeners();
+      socket.on("error", () => {});
       try {
-        socket.close(1000, "stopped");
+        if (socket.readyState === WebSocket.CONNECTING) socket.terminate();
+        else socket.close(1000, "stopped");
       } catch {
         // Closing an already-closed socket is not an error worth surfacing.
       }
@@ -155,7 +164,7 @@ export class TunnelClient {
     const socket = new WebSocket(this.url, {
       headers: {
         authorization,
-        "user-agent": "dsh-plugin-dshoo/0.1.0",
+        "user-agent": `dsh-plugin-dshoo/${pluginVersion}`,
       },
       handshakeTimeout: 20_000,
       perMessageDeflate: false,
@@ -163,7 +172,8 @@ export class TunnelClient {
     });
     this.socket = socket;
 
-    const helloTimeout = setTimeout(() => {
+    this.clearHello();
+    this.helloTimeout = setTimeout(() => {
       if (this.ack === undefined) {
         this.log("server did not acknowledge the connection in time");
         socket.terminate();
@@ -171,6 +181,8 @@ export class TunnelClient {
     }, 20_000);
 
     socket.on("open", () => {
+      // stop() may have been called while the handshake was in flight.
+      if (this.socket !== socket) return;
       socket.send(JSON.stringify(this.handlers.hello()), { binary: false });
     });
 
@@ -189,8 +201,8 @@ export class TunnelClient {
     });
 
     socket.on("close", (code: number) => {
-      clearTimeout(helloTimeout);
       if (this.socket !== socket) return;
+      this.clearHello();
       this.stopHeartbeat();
       this.socket = undefined;
       this.ack = undefined;
@@ -206,14 +218,14 @@ export class TunnelClient {
     });
 
     socket.on("error", (error: Error) => {
-      clearTimeout(helloTimeout);
+      this.clearHello();
       this.detail = describeError(error);
       if (!this.stopped) this.log(`tunnel error: ${this.detail}`);
     });
 
     // A server that rejects the credentials answers 401 before upgrading.
     socket.on("unexpected-response", (_request, response) => {
-      clearTimeout(helloTimeout);
+      this.clearHello();
       this.detail = response.statusCode === 401
         ? "服务器拒绝了用户名或密码"
         : `服务器返回 ${response.statusCode ?? "未知状态"}`;
@@ -221,6 +233,14 @@ export class TunnelClient {
       response.resume();
       socket.terminate();
     });
+  }
+
+  /** Cancel the handshake deadline; safe to call more than once. */
+  private clearHello(): void {
+    if (this.helloTimeout !== undefined) {
+      clearTimeout(this.helloTimeout);
+      this.helloTimeout = undefined;
+    }
   }
 
   private handleControl(data: Buffer): void {

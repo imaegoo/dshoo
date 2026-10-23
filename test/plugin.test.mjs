@@ -3,6 +3,7 @@
 import assert from "node:assert/strict";
 import { once } from "node:events";
 import { readFileSync } from "node:fs";
+import net from "node:net";
 import test from "node:test";
 
 import { WebSocketServer } from "ws";
@@ -106,6 +107,9 @@ test("a tunnel whose pongs stop arriving drops the socket and reconnects", async
     while (connections < 2 && Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
+    while (states[states.length - 1] !== "connected" && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
     assert.ok(connections >= 2, `expected a reconnect, saw ${connections} connection(s)`);
     assert.deepEqual(states.slice(0, 3), ["connecting", "connected", "reconnecting"]);
   } finally {
@@ -113,4 +117,37 @@ test("a tunnel whose pongs stop arriving drops the socket and reconnects", async
     for (const socket of server.clients) socket.terminate();
     server.close();
   }
+});
+
+test("stopping while a socket is still dialling does not throw", async () => {
+  // Aborting a handshake makes `ws` emit an error; an unhandled error event
+  // would take down the harness host that runs the plugin.
+  const server = net.createServer(() => {
+    // Accept the TCP connection and never answer the upgrade request.
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address();
+
+  const client = new TunnelClient(`ws://127.0.0.1:${port}/tunnel`, "user", "pass", {
+    hello: () => ({
+      key: "test-key",
+      name: "test",
+      hostname: "test",
+      os: "win32",
+      arch: "x64",
+      dshVersion: "0",
+      pid: process.pid,
+      guiPort: 0,
+      pluginVersion: "0",
+    }),
+    onFrame: () => {},
+    onState: () => {},
+  }, () => {});
+
+  client.start();
+  await new Promise((resolve) => setTimeout(resolve, 150));
+  client.stop();
+  // Give the aborted handshake time to surface its error.
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  server.close();
 });
