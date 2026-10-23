@@ -3,6 +3,7 @@
 import assert from "node:assert/strict";
 import { once } from "node:events";
 import { readFileSync } from "node:fs";
+import { createServer } from "node:http";
 import net from "node:net";
 import test from "node:test";
 
@@ -73,6 +74,18 @@ test("reports the version from the package manifest", () => {
   assert.equal(pluginVersion, manifest.version);
 });
 
+test("the remote document declares the language the harness will use", () => {
+  // The harness ships lang="en" and corrects it only after boot; Chrome offers
+  // to translate the app before that happens.
+  const html = "<!doctype html><html lang=\"en\"><body></body></html>";
+  assert.ok(rewriteIndex(html, "/i/abc", "zh-CN,zh;q=0.9,en;q=0.8").includes("<html lang=\"zh-CN\">"));
+  assert.ok(rewriteIndex(html, "/i/abc", "en-US,en;q=0.9").includes("<html lang=\"en\">"));
+  // No header: leave the document as the harness wrote it.
+  assert.ok(rewriteIndex(html, "/i/abc").includes("<html lang=\"en\">"));
+  // A document without a lang attribute gets one.
+  assert.ok(rewriteIndex("<html><body></body></html>", "/i/abc", "zh-TW").includes("<html lang=\"zh-CN\">"));
+});
+
 test("the remote page gets the HUD, the local page does not", () => {
   const html = "<html><body><div id=\"root\"></div></body></html>";
   const remote = rewriteIndex(html, "/i/abc");
@@ -120,6 +133,58 @@ test("the HUD endpoints are answered without the harness", () => {
   assert.deepEqual(types(2), [FrameResHead, FrameResBody, FrameResEnd]);
   const body = frames.find((frame) => frame.id === 2 && frame.type === FrameResBody).payload.toString("utf8");
   assert.ok(body.includes("dshoo-hud"));
+});
+
+test("the proxied index is served with the browser's language", async () => {
+  // The server forwards browser headers with Go's canonical casing, so the
+  // plugin has to look the header up case-insensitively.
+  const origin = createServer((_request, response) => {
+    response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    response.end("<!doctype html><html lang=\"en\"><body>hi</body></html>");
+  });
+  await new Promise((resolve) => origin.listen(0, "127.0.0.1", resolve));
+  const { port } = origin.address();
+  const frames = [];
+  const bridge = new Bridge({
+    harness: {
+      port: () => port,
+      sessionCookie: async () => "dsh=1",
+      authority: () => "127.0.0.1:1",
+      origin: () => "http://127.0.0.1:1",
+    },
+    prefix: () => "/i/abc",
+    send: (frame) => {
+      frames.push(decodeFrame(frame));
+      return true;
+    },
+    log: () => {},
+  });
+
+  bridge.onFrame({
+    type: FrameReqHead,
+    id: 5,
+    payload: Buffer.from(JSON.stringify({
+      method: "GET",
+      path: "/",
+      headers: { "Accept-Language": ["zh-CN,zh;q=0.9,en;q=0.8"] },
+    })),
+  });
+  bridge.onFrame({ type: FrameReqEnd, id: 5, payload: Buffer.alloc(0) });
+
+  try {
+    const deadline = Date.now() + 3000;
+    while (!frames.some((frame) => frame.id === 5 && frame.type === FrameResEnd) && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    const body = frames
+      .filter((frame) => frame.id === 5 && frame.type === FrameResBody)
+      .map((frame) => frame.payload)
+      .join("");
+    assert.ok(body.includes("<html lang=\"zh-CN\">"), body.slice(0, 120));
+    assert.ok(body.includes("/__dshoo/hud.js"));
+  } finally {
+    origin.close();
+  }
 });
 
 test("a tunnel whose pongs stop arriving drops the socket and reconnects", async () => {

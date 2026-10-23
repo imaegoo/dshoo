@@ -21,7 +21,7 @@ import {
   type SocketOpen,
 } from "./protocol.js";
 import type { LocalHarness } from "./harness.js";
-import { HUD_PING_PATH, HUD_SCRIPT_PATH, hudScript, injectHud } from "./hud.js";
+import { HUD_PING_PATH, HUD_SCRIPT_PATH, hudScript, injectHud, withDocumentLanguage } from "./hud.js";
 
 /** Request headers that describe one hop and must not be relayed. */
 const HOP_BY_HOP = new Set([
@@ -325,7 +325,11 @@ export class Bridge {
       delete headers["content-length"];
       try {
         const body = await readAll(response);
-        const rewritten = rewriteIndex(body.toString("utf8"), this.deps.prefix());
+        const rewritten = rewriteIndex(
+          body.toString("utf8"),
+          this.deps.prefix(),
+          requestHeader(pending.headers, "accept-language"),
+        );
         const payload = Buffer.from(rewritten, "utf8");
         this.sendHead(id, status, { ...headers, "content-length": [String(payload.length)] });
         if (payload.length > 0) this.deps.send(encodeFrame(FrameResBody, id, payload));
@@ -452,6 +456,15 @@ export class Bridge {
   }
 }
 
+/** Read a request header whatever case the server forwarded it in. */
+function requestHeader(headers: Record<string, string[]>, name: string): string {
+  const wanted = name.toLowerCase();
+  for (const [key, values] of Object.entries(headers)) {
+    if (key.toLowerCase() === wanted) return values[0] ?? "";
+  }
+  return "";
+}
+
 /** Read a whole response body with a size cap. */
 async function readAll(response: IncomingMessage): Promise<Buffer> {
   const chunks: Buffer[] = [];
@@ -476,11 +489,11 @@ async function readAll(response: IncomingMessage): Promise<Buffer> {
  * page also gets the HUD: it is injected here, so opening the harness locally
  * never shows it.
  */
-export function rewriteIndex(html: string, prefix: string): string {
+export function rewriteIndex(html: string, prefix: string, acceptLanguage = ""): string {
   if (prefix === "") return html;
   const rewritten = html
     .replace(/(\s(?:src|href)=")\/(?!\/)/gu, `$1${prefix}/`)
     .replace(/"\/plugins\//gu, `"${prefix}/plugins/`)
     .replace(/"\/assets\//gu, `"${prefix}/assets/`);
-  return injectHud(rewritten, prefix);
+  return injectHud(withDocumentLanguage(rewritten, acceptLanguage), prefix);
 }
