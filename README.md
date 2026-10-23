@@ -53,6 +53,8 @@ dsh plugin --profile web add dshoo
 
 ![实例](docs/instance.webp)
 
+远程打开的实例左上角有一个胶囊：返回实例列表，以及当前链路延迟（绿 ≤ 120ms、黄 ≤ 300ms、红 > 300ms）。这个胶囊只出现在远程页面里，本机直接打开 dsh 时没有。
+
 ## 配置
 
 服务端全部通过环境变量配置：
