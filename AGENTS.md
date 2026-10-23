@@ -15,7 +15,7 @@ src/server/          Go 服务端（module dshoo）
 src/plugin/          dsh 插件（npm 包名 dshoo，TS → lib/）
   src/index.ts       插件装配、设置 API、隧道生命周期
   src/tunnel.ts      到服务端的 WSS 客户端（健康后 1s / 其余 10s 重试）
-  src/bridge.ts      帧 ⇄ 本机 dsh 的 HTTP/WebSocket 代理
+  src/bridge.ts      帧 ⇄ 本机 dsh 的 HTTP/WebSocket 代理；远程页面注入返回/延迟胶囊
   src/harness.ts     本机 GUI 端口与登录 cookie
   src/config.ts      ~/.dsh/dshoo.json
   src/version.ts     从 package.json 读插件版本（hello 与设置页上报）
@@ -45,7 +45,7 @@ dsh plugin --profile web add "$PWD/src/plugin"
 
 ## 端到端验证
 
-四个脚本都需要一台在跑的服务端；浏览器脚本还需要本机 Edge（可用 `DSHOO_BROWSER` 指定其它 Chromium）。
+前四个脚本都需要一台在跑的服务端；浏览器脚本还需要本机 Edge（可用 `DSHOO_BROWSER` 指定其它 Chromium）。`hud-check.mjs` 自带一个假实例，不需要服务端。
 
 ```sh
 node test/e2e.mjs http://127.0.0.1:9830 admin <密码>
@@ -58,6 +58,7 @@ node test/mobile-check.mjs http://127.0.0.1:9830 admin <密码>
 - `browser-check.mjs`：未登录访问必须落到 `/login`；登录后点卡片直接进入 `/i/<id>/`，dsh 完整启动且无控制台报错。
 - `plugin-ui-check.mjs`：直接打开 dsh GUI，断言「远程访问」入口注册、字段与连接状态渲染、密码输入不留存、重开设置页回填。
 - `mobile-check.mjs`：用 Pixel 7 视口跑登录、实例列表与离线页；自己建一条隧道再等它掉线，断言页面用手机视口渲染（980px 回退会直接失败）、不横向溢出、触摸设备上能点到「移除」。跑完删掉自己建的实例。
+- `hud-check.mjs`：不需要服务端。把假 index 跑一遍 `rewriteIndex`，用本地 HTTP 服务器提供页面、HUD 脚本和延迟可调的 ping，断言胶囊位置、绿/黄/红、手机紧凑形态，以及「本机页面没有胶囊」。
 
 ## 工作原理
 
@@ -79,6 +80,13 @@ node test/mobile-check.mjs http://127.0.0.1:9830 admin <密码>
 
 **设置页表单**：草稿跟随宿主快照，除非用户正在编辑（`dirty`）。所以重新打开设置页永远显示已保存的配置；密码框在获得焦点时不会被写入。
 
+**远程页面胶囊**：远程打开 `/i/<id>/` 时，页面左上角有一个返回按钮和延迟胶囊（16px 贴边，手机上收成箭头 + 三格 + 数字）。
+
+- 注入点在 `bridge.ts` 的 `rewriteIndex`：只改写经过隧道的 HTML，所以本机直接打开 dsh 不会出现胶囊。
+- 胶囊运行在 shadow DOM 里，避免被 dsh 的全局样式影响；脚本由插件自己提供（`/i/<id>/__dshoo/hud.js`），不占隧道以外的资源。
+- 延迟探针打 `/i/<id>/__dshoo/ping`，插件直接回 204，不经过 dsh；测出来的就是 浏览器 → 服务器 → 隧道 → 插件 的往返。用 Resource Timing 的 `responseStart - requestStart`，不用 `performance.now()`（页面启动时主线程忙会让后者虚高）。
+- 阈值：≤120ms 绿三格、≤300ms 黄两格、其余红一格；超时两次显示 `—`；数字封顶 99999。首次探测是预热，不算进中位数，之后每 5 秒一次、显示最近 3 次中位数；页面隐藏时暂停。
+
 **首次初始化**：数据库没有账号时，除 `/setup`、`/static/*`、`/healthz`、`/api/setup` 外全部 302 到 `/setup`（API 返回 428）。`store.CreateFirstUser` 用 `INSERT ... WHERE NOT EXISTS (SELECT 1 FROM users)` 保证并发下只创建一个账号。没有环境变量种子账号，也没有默认密码。
 
 ## 约定
@@ -90,6 +98,7 @@ node test/mobile-check.mjs http://127.0.0.1:9830 admin <密码>
 - 代理会剥掉实例响应的 CSP / `X-Frame-Options` 与 `Set-Cookie`，并且不转发浏览器的 cookie 给实例——这是「同源内嵌 + 插件自持凭据」的前提，改动前先想清楚。
 - Go 版本：`src/server/go.mod` 的 `go` 指令钉精确补丁版本（CI 与发布二进制读它），`src/server/Dockerfile` 浮在同一个次版本线上（`golang:1.27-alpine`），以便自动吃到补丁。升级小版本时两处一起改。
 - 移动端：服务端每张页面都必须带 `<meta name="viewport" content="width=device-width, initial-scale=1">`，漏了会让手机按 980px 排版（文字缩成一条），`test/mobile-check.mjs` 会直接报出来。小屏断点是 `620px`；触摸设备没有 hover，卡片上的「移除」靠 `@media (hover: none)` 常显，键盘用户靠 `:focus-within`。
+- 胶囊脚本（`bridge.ts` 的 `installHud`）是靠 `toString()` 序列化进页面的，函数体必须自包含：不能引用模块作用域、导入或外部常量（超时、阈值都写成函数内的字面量）。改完跑 `test/hud-check.mjs`，它会在真实浏览器里验证位置、颜色和手机形态。
 
 ## 发布
 

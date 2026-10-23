@@ -8,7 +8,16 @@ import test from "node:test";
 
 import { WebSocketServer } from "ws";
 
+import { Bridge, hudScript, rewriteIndex } from "../src/plugin/lib/bridge.js";
 import { normalizeServer, tunnelUrl } from "../src/plugin/lib/config.js";
+import {
+  decodeFrame,
+  FrameReqEnd,
+  FrameReqHead,
+  FrameResBody,
+  FrameResEnd,
+  FrameResHead,
+} from "../src/plugin/lib/protocol.js";
 import { retryDelayMs, TunnelClient } from "../src/plugin/lib/tunnel.js";
 import { pluginVersion } from "../src/plugin/lib/version.js";
 
@@ -61,6 +70,55 @@ test("retry stays at ten seconds otherwise", () => {
 test("reports the version from the package manifest", () => {
   const manifest = JSON.parse(readFileSync(new URL("../src/plugin/package.json", import.meta.url), "utf8"));
   assert.equal(pluginVersion, manifest.version);
+});
+
+test("the remote page gets the HUD, the local page does not", () => {
+  const html = "<html><body><div id=\"root\"></div></body></html>";
+  const remote = rewriteIndex(html, "/i/abc");
+  assert.ok(remote.includes("<script src=\"/i/abc/__dshoo/hud.js\" defer></script>"));
+  assert.ok(remote.indexOf("__dshoo/hud.js") < remote.indexOf("</body>"));
+  // Opening the harness directly never goes through this rewrite.
+  assert.equal(rewriteIndex(html, ""), html);
+});
+
+test("the HUD script stands on its own", () => {
+  const script = hudScript();
+  assert.ok(script.includes("dshoo-hud"));
+  assert.ok(!script.includes("</script"));
+  // It is inlined into the page, so a syntax error would break the harness UI.
+  assert.doesNotThrow(() => new Function(script));
+});
+
+test("the HUD endpoints are answered without the harness", () => {
+  const frames = [];
+  const bridge = new Bridge({
+    harness: {
+      port() { throw new Error("the harness must not be touched"); },
+      sessionCookie() { throw new Error("the harness must not be touched"); },
+    },
+    prefix: () => "/i/abc",
+    send: (frame) => {
+      frames.push(decodeFrame(frame));
+      return true;
+    },
+    log: () => {},
+  });
+  const request = (id, path) => {
+    bridge.onFrame({ type: FrameReqHead, id, payload: Buffer.from(JSON.stringify({ method: "GET", path, headers: {} })) });
+    bridge.onFrame({ type: FrameReqEnd, id, payload: Buffer.alloc(0) });
+  };
+
+  request(1, "/__dshoo/ping?t=1");
+  request(2, "/__dshoo/hud.js");
+
+  const types = (id) => frames.filter((frame) => frame.id === id).map((frame) => frame.type);
+  assert.deepEqual(types(1), [FrameResHead, FrameResEnd]);
+  const ping = JSON.parse(frames.find((frame) => frame.id === 1).payload.toString("utf8"));
+  assert.equal(ping.status, 204);
+
+  assert.deepEqual(types(2), [FrameResHead, FrameResBody, FrameResEnd]);
+  const body = frames.find((frame) => frame.id === 2 && frame.type === FrameResBody).payload.toString("utf8");
+  assert.ok(body.includes("dshoo-hud"));
 });
 
 test("a tunnel whose pongs stop arriving drops the socket and reconnects", async () => {
