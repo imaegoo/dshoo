@@ -124,6 +124,17 @@ check("list does not scroll sideways", size.scroll <= size.client + 1, `${size.s
 
 const remove = page.locator(".card", { hasText: "mobile-check" }).locator("xpath=..").locator(".remove");
 check("touch shows the remove action", await remove.isVisible());
+
+// The list groups by presence, and each heading counts its own cards.
+check("offline instances sit in their own group", await page.locator("#offline-group").isVisible());
+const offlineCards = await page.locator("#offline-group .card").count();
+const offlineCount = (await page.locator("#offline-count").textContent()).trim();
+check("the group heading counts its cards", offlineCount === String(offlineCards), `${offlineCount} vs ${offlineCards}`);
+if (await page.locator("#online-group").isVisible()) {
+  const onlineCards = await page.locator("#online-group .card").count();
+  const onlineCount = (await page.locator("#online-count").textContent()).trim();
+  check("the online heading counts its cards", onlineCount === String(onlineCards), `${onlineCount} vs ${onlineCards}`);
+}
 await page.screenshot({ path: `${shots}mobile-instances.png` });
 
 // --- the offline page ------------------------------------------------------

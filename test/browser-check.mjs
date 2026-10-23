@@ -65,6 +65,7 @@ await page.goto(new URL("/", server).href, { waitUntil: "networkidle" });
 await page.waitForSelector(".card, .empty", { timeout: 15000 });
 const cards = await page.locator(".card").count();
 check("instance list renders", cards >= 1, `${cards} card(s)`);
+check("instances are grouped", await page.locator(".group:not([hidden])").count() >= 1);
 await page.screenshot({ path: `${shots}instances.png` });
 
 // Open a live instance: an offline card leads to the proxy's own "instance

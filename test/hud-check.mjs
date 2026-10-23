@@ -40,12 +40,18 @@ const server = createServer((request, response) => {
     response.end(remotePage);
     return;
   }
-  if (url.pathname === "/i/abc/__dshoo/hud.js") {
+  if (url.pathname === "/i/xyz/") {
+    // A second instance, used to prove the position is shared.
+    response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    response.end(rewriteIndex(fixture, "/i/xyz"));
+    return;
+  }
+  if (url.pathname.endsWith("/__dshoo/hud.js")) {
     response.writeHead(200, { "content-type": "text/javascript; charset=utf-8" });
     response.end(script);
     return;
   }
-  if (url.pathname === "/i/abc/__dshoo/ping") {
+  if (url.pathname.endsWith("/__dshoo/ping")) {
     setTimeout(() => {
       response.writeHead(204, { "cache-control": "no-store" });
       response.end();
@@ -168,6 +174,16 @@ const restored = await page.locator("#dshoo-hud").boundingBox();
 check("position survives a reload",
   Math.abs(restored.x - (viewport.width - restored.width - 16)) <= 1,
   `x ${restored.x.toFixed(1)}`);
+
+// One stored position for every instance, not one per instance.
+const other = await desktop.newPage();
+await other.goto(`${origin}/i/xyz/`, { waitUntil: "networkidle" });
+await waitForNumber(other);
+const otherBox = await other.locator("#dshoo-hud").boundingBox();
+check("the position is shared across instances",
+  Math.abs(otherBox.x - (viewport.width - otherBox.width - 16)) <= 1,
+  `x ${otherBox.x.toFixed(1)}`);
+await other.close();
 
 // Dropping within 16px of a corner snaps both axes, not just one.
 const cornerGrab = await page.locator(".hud").boundingBox();
